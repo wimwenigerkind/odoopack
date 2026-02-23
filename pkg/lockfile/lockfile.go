@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/spf13/viper"
 	"github.com/wimwenigerkind/odoopack/pkg/helper"
 )
-
-var lockFilePath string = "odoopack.lock"
 
 func LoadOrNew() LockFile {
 	lf, err := Load()
@@ -25,7 +24,7 @@ func LoadOrNew() LockFile {
 }
 
 func Load() (LockFile, error) {
-	exists, err := helper.FileExists(lockFilePath)
+	exists, err := helper.FileExists(viper.GetString("lock"))
 	if err != nil {
 		return LockFile{}, err
 	}
@@ -33,7 +32,7 @@ func Load() (LockFile, error) {
 		return LockFile{}, fmt.Errorf("odoopack.lock not found")
 	}
 
-	data, err := os.ReadFile(lockFilePath)
+	data, err := os.ReadFile(viper.GetString("lock"))
 	if err != nil {
 		return LockFile{}, err
 	}
@@ -50,7 +49,7 @@ func Save(lockFile LockFile) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(lockFilePath, data, 0644)
+	return os.WriteFile(viper.GetString("lock"), data, 0644)
 }
 
 func ComputeHash(require map[string]string) (string, error) {

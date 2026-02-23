@@ -5,31 +5,30 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/spf13/viper"
 	"github.com/wimwenigerkind/odoopack/pkg/helper"
 )
 
-var manifestFilePath string = "odoopack.json"
-
-func Load() (Manifest, error) {
-	exists, err := helper.FileExists(manifestFilePath)
+func Load() (*Manifest, error) {
+	exists, err := helper.FileExists(viper.GetString("manifest"))
 	if err != nil {
-		return Manifest{}, err
+		return nil, err
 	}
 	if !exists {
-		return Manifest{}, fmt.Errorf("odoopack.json not found, run 'odoopack init' first")
+		return nil, fmt.Errorf("odoopack.json not found, run 'odoopack init' first")
 	}
 
-	data, err := os.ReadFile(manifestFilePath)
+	data, err := os.ReadFile(viper.GetString("manifest"))
 	if err != nil {
-		return Manifest{}, err
+		return nil, err
 	}
 
 	var manifest Manifest
 	if err := json.Unmarshal(data, &manifest); err != nil {
-		return Manifest{}, err
+		return nil, err
 	}
 
-	return manifest, nil
+	return &manifest, nil
 }
 
 func Save(manifest Manifest) error {
@@ -37,11 +36,11 @@ func Save(manifest Manifest) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(manifestFilePath, data, 0644)
+	return os.WriteFile(viper.GetString("manifest"), data, 0644)
 }
 
 func Init(name string) (Manifest, error) {
-	exists, err := helper.FileExists(manifestFilePath)
+	exists, err := helper.FileExists(viper.GetString("manifest"))
 	if err != nil {
 		return Manifest{}, err
 	}
@@ -49,7 +48,7 @@ func Init(name string) (Manifest, error) {
 		return Manifest{}, fmt.Errorf("odoopack.json already exists")
 	}
 
-	manifest := NewManifest(name)
+	manifest := NewManifest(name, viper.GetString("index_url"), viper.GetString("addons_path"))
 
 	if err := Save(*manifest); err != nil {
 		return Manifest{}, err
@@ -58,17 +57,12 @@ func Init(name string) (Manifest, error) {
 	return *manifest, nil
 }
 
-func AddRequirement(name, version string) error {
-	manifest, err := Load()
-	if err != nil {
-		return err
+func (m *Manifest) AddRequirement(name, version string) error {
+	if m.Require == nil {
+		m.Require = make(Requirements)
 	}
 
-	if manifest.Require == nil {
-		manifest.Require = make(Requirements)
-	}
+	m.Require[name] = version
 
-	manifest.Require[name] = version
-
-	return Save(manifest)
+	return Save(*m)
 }

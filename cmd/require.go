@@ -28,8 +28,14 @@ var requireCmd = &cobra.Command{
 			version = addonParts[1]
 		}
 
+		m, err := manifest.Load()
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
 		indexProvider := index.StaticProvider{
-			Endpoint: "http://localhost:6969/static.json",
+			Endpoint: m.Indexes["default"].Url,
 		}
 
 		lookup, err := indexProvider.Lookup(addonName, version)
@@ -38,7 +44,7 @@ var requireCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		if err := manifest.AddRequirement(lookup.Name, lookup.Version); err != nil {
+		if err := m.AddRequirement(lookup.Name, lookup.Version); err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}
@@ -51,8 +57,11 @@ var requireCmd = &cobra.Command{
 			Repository: lookup.Repository,
 		}
 
-		m, _ := manifest.Load()
-		lockFile.ContentHash, _ = lockfile.ComputeHash(m.Require)
+		lockFile.ContentHash, err = lockfile.ComputeHash(m.Require)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
 
 		err = lockfile.Save(lockFile)
 		if err != nil {
@@ -65,7 +74,7 @@ var requireCmd = &cobra.Command{
 			fmt.Println(err)
 			os.Exit(1)
 		}
-		err = inst.Install("custom/odoopack/", lookup.Name, lockFile.Packages[lookup.Name])
+		err = inst.Install(m.AddonsPath, lookup.Name, lockFile.Packages[lookup.Name])
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)

@@ -48,7 +48,10 @@ func (i *GitInstaller) Install(targetDir string, addonName string, pkg lockfile.
 		return err
 	}
 
-	os.RemoveAll(dest)
+	err = os.RemoveAll(dest)
+	if err != nil {
+		return err
+	}
 
 	err = os.Rename(tmpDir, dest)
 	if err != nil {

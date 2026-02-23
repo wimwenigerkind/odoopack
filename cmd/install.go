@@ -31,7 +31,7 @@ var installCmd = &cobra.Command{
 		}
 
 		indexProvider := index.StaticProvider{
-			Endpoint: "http://localhost:6969/static.json",
+			Endpoint: m.Indexes["default"].Url,
 		}
 
 		lockFile := lockfile.LoadOrNew()
@@ -69,9 +69,7 @@ var installCmd = &cobra.Command{
 			}
 		}
 
-		addonPath := "custom/odoopack/"
-
-		err = os.RemoveAll(addonPath)
+		err = os.RemoveAll(m.AddonsPath)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -87,7 +85,7 @@ var installCmd = &cobra.Command{
 				os.Exit(1)
 			}
 
-			err = inst.Install(addonPath, name, lockedPackage)
+			err = inst.Install(m.AddonsPath, name, lockedPackage)
 			if err != nil {
 				fmt.Println(err)
 				os.Exit(1)
