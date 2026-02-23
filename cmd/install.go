@@ -60,7 +60,11 @@ var installCmd = &cobra.Command{
 				}
 			}
 
-			lockFile.ContentHash, _ = lockfile.ComputeHash(m.Require)
+			lockFile.ContentHash, err = lockfile.ComputeHash(m.Require)
+			if err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
 
 			err = lockfile.Save(lockFile)
 			if err != nil {
