@@ -1,39 +1,80 @@
 /*
-Copyright © 2026 NAME HERE <EMAIL ADDRESS>
+Copyright © 2026 Wim Wenigerkind
 */
 package cmd
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/wimwenigerkind/odoopack/pkg/index"
+	"github.com/wimwenigerkind/odoopack/pkg/installer"
+	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
+	"github.com/wimwenigerkind/odoopack/pkg/manifest"
 )
 
-// requireCmd represents the require command
 var requireCmd = &cobra.Command{
-	Use:   "require",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Use:   "require [addon]@[version]",
+	Short: "Add an addon dependency",
+	Args:  cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("require called")
+		addon := args[0]
+		addonParts := strings.Split(addon, "@")
+		addonName := addonParts[0]
+		version := "latest"
+		if len(addonParts) > 1 {
+			version = addonParts[1]
+		}
+
+		indexProvider := index.StaticProvider{
+			Endpoint: "http://localhost:6969/static.json",
+		}
+
+		lookup, err := indexProvider.Lookup(addonName, version)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		if err := manifest.AddRequirement(lookup.Name, lookup.Version); err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		lockFile := lockfile.LoadOrNew()
+
+		lockFile.Packages[lookup.Name] = lockfile.LockedPackage{
+			Version:    lookup.Version,
+			Type:       lookup.Type,
+			Repository: lookup.Repository,
+		}
+
+		m, _ := manifest.Load()
+		lockFile.ContentHash, _ = lockfile.ComputeHash(m.Require)
+
+		err = lockfile.Save(lockFile)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		inst, err := installer.New(lookup.Type)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		err = inst.Install("custom/odoopack/", lookup.Name, lockFile.Packages[lookup.Name])
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		fmt.Printf("Added %s@%s\n", lookup.Name, lookup.Version)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(requireCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// requireCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// requireCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

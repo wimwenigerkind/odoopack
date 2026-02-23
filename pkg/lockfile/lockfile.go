@@ -1,0 +1,75 @@
+package lockfile
+
+import (
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
+	"os"
+
+	"github.com/wimwenigerkind/odoopack/pkg/helper"
+)
+
+var lockFilePath string = "odoopack.lock"
+
+func LoadOrNew() LockFile {
+	lf, err := Load()
+	if err != nil {
+		return LockFile{
+			Packages: make(map[string]LockedPackage),
+		}
+	}
+	if lf.Packages == nil {
+		lf.Packages = make(map[string]LockedPackage)
+	}
+	return lf
+}
+
+func Load() (LockFile, error) {
+	exists, err := helper.FileExists(lockFilePath)
+	if err != nil {
+		return LockFile{}, err
+	}
+	if !exists {
+		return LockFile{}, fmt.Errorf("odoopack.lock not found")
+	}
+
+	data, err := os.ReadFile(lockFilePath)
+	if err != nil {
+		return LockFile{}, err
+	}
+
+	var lockFile LockFile
+	if err := json.Unmarshal(data, &lockFile); err != nil {
+		return LockFile{}, err
+	}
+
+	return lockFile, nil
+}
+func Save(lockFile LockFile) error {
+	data, err := json.MarshalIndent(lockFile, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(lockFilePath, data, 0644)
+}
+
+func ComputeHash(require map[string]string) (string, error) {
+	data, err := json.Marshal(require)
+	if err != nil {
+		return "", err
+	}
+
+	hash := sha256.Sum256(data)
+	return fmt.Sprintf("sha256:%x", hash), nil
+}
+
+func IsStale(require map[string]string, hash string) (bool, error) {
+	computedHash, err := ComputeHash(require)
+	if err != nil {
+		return false, err
+	}
+	if computedHash != hash {
+		return true, nil
+	}
+	return false, nil
+}
