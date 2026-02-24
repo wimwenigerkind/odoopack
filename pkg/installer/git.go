@@ -15,6 +15,7 @@ type GitInstaller struct{}
 func NewGitInstaller() *GitInstaller {
 	return &GitInstaller{}
 }
+
 func (i *GitInstaller) Install(targetDir string, addonName string, pkg lockfile.LockedPackage) error {
 	tmpDir, err := os.MkdirTemp("", "odoopack-*")
 	if err != nil {

@@ -14,6 +14,8 @@ func New(sourceType string) (Installer, error) {
 	switch sourceType {
 	case "git":
 		return NewGitInstaller(), nil
+	case "zip":
+		return NewZipInstaller(), nil
 	default:
 		return nil, fmt.Errorf("installer type %q is not supported", sourceType)
 	}
