@@ -34,36 +34,21 @@ var installCmd = &cobra.Command{
 			Endpoint: m.Indexes["default"].Url,
 		}
 
-		lockFile := lockfile.LoadOrNew()
+		lock := lockfile.LoadOrNew()
 
-		isStale, err := lockfile.IsStale(m.Require, lockFile.ContentHash)
+		isStale, err := lockfile.IsStale(m.Require, lock.ContentHash)
 		if err != nil {
 			fatal(err)
 		}
+
 		if isStale {
 			fmt.Println("lockfile is stale")
-
-			lockFile.Packages = make(map[string]lockfile.LockedPackage)
-
-			for name, version := range m.Require {
-				lookup, err := indexProvider.Lookup(name, version)
-				if err != nil {
-					fatal(err)
-				}
-
-				lockFile.Packages[lookup.Name] = lockfile.LockedPackage{
-					Version:    lookup.Version,
-					Type:       lookup.Type,
-					Repository: lookup.Repository,
-				}
-			}
-
-			lockFile.ContentHash, err = lockfile.ComputeHash(m.Require)
+			lock, err = lockfile.RecomputeHash(m.Require, &indexProvider)
 			if err != nil {
 				fatal(err)
 			}
 
-			err = lockfile.Save(lockFile)
+			err = lockfile.Save(lock)
 			if err != nil {
 				fatal(err)
 			}
@@ -75,7 +60,7 @@ var installCmd = &cobra.Command{
 
 		fmt.Println("Install")
 
-		for name, lockedPackage := range lockFile.Packages {
+		for name, lockedPackage := range lock.Packages {
 			fmt.Printf("cloning %s@%s\n", name, lockedPackage.Version)
 			inst, err := installer.New(lockedPackage.Type)
 			if err != nil {

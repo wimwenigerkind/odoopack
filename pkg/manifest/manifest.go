@@ -66,3 +66,7 @@ func (m *Manifest) AddRequirement(name, version string) error {
 
 	return Save(*m)
 }
+
+func (m *Manifest) RemoveRequirement(name string) {
+	delete(m.Require, name)
+}

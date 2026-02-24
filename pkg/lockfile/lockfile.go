@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/viper"
 	"github.com/wimwenigerkind/odoopack/pkg/helper"
+	"github.com/wimwenigerkind/odoopack/pkg/index"
 )
 
 func LoadOrNew() LockFile {
@@ -71,4 +72,33 @@ func IsStale(require map[string]string, hash string) (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+func RecomputeHash(require map[string]string, provider index.Provider) (LockFile, error) {
+	packages := make(map[string]LockedPackage)
+
+	for name, version := range require {
+		lookup, err := provider.Lookup(name, version)
+		if err != nil {
+			return LockFile{}, err
+		}
+
+		packages[lookup.Name] = LockedPackage{
+			Version:    lookup.Version,
+			Type:       lookup.Type,
+			Repository: lookup.Repository,
+		}
+	}
+
+	lockFile := LockFile{
+		Packages: packages,
+	}
+
+	hash, err := ComputeHash(require)
+	if err != nil {
+		return LockFile{}, err
+	}
+	lockFile.ContentHash = hash
+
+	return lockFile, nil
 }

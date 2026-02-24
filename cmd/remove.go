@@ -5,35 +5,69 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/wimwenigerkind/odoopack/pkg/index"
+	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
+	"github.com/wimwenigerkind/odoopack/pkg/manifest"
 )
 
-// removeCmd represents the remove command
 var removeCmd = &cobra.Command{
-	Use:   "remove",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Use:   "remove [addon]",
+	Short: "Remove a addon from requirements",
+	Args:  cobra.RangeArgs(1, 1),
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("remove called")
+		addon := args[0]
+		addonParts := strings.Split(addon, "@")
+		addonName := addonParts[0]
+
+		m, err := manifest.Load()
+		if err != nil {
+			fatal(err)
+		}
+
+		if len(m.Require) == 0 {
+			fmt.Println("no addons installed")
+			return
+		}
+
+		if m.Require[addonName] == "" {
+			fatal(fmt.Errorf("addon is not installed"))
+		}
+		version := m.Require[addonName]
+
+		m.RemoveRequirement(addonName)
+		if err := manifest.Save(*m); err != nil {
+			fatal(err)
+		}
+
+		indexProvider := index.StaticProvider{
+			Endpoint: m.Indexes["default"].Url,
+		}
+
+		lock, err := lockfile.RecomputeHash(m.Require, &indexProvider)
+		if err != nil {
+			fatal(err)
+		}
+
+		err = lockfile.Save(lock)
+		if err != nil {
+			fatal(err)
+		}
+
+		addonDir := strings.ReplaceAll(addonName, "/", "_")
+		err = os.RemoveAll(filepath.Join(m.AddonsPath, addonDir))
+		if err != nil {
+			fatal(err)
+		}
+
+		fmt.Println("removed", addonName+"@"+version)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(removeCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// removeCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// removeCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
