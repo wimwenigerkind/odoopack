@@ -22,12 +22,11 @@ var installCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		m, err := manifest.Load()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			fatal(err)
 		}
 
 		if len(m.Require) == 0 {
-			fmt.Println("Nothing to install")
+			fmt.Println("no addons installed")
 			return
 		}
 
@@ -39,8 +38,7 @@ var installCmd = &cobra.Command{
 
 		isStale, err := lockfile.IsStale(m.Require, lockFile.ContentHash)
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			fatal(err)
 		}
 		if isStale {
 			fmt.Println("lockfile is stale")
@@ -50,8 +48,7 @@ var installCmd = &cobra.Command{
 			for name, version := range m.Require {
 				lookup, err := indexProvider.Lookup(name, version)
 				if err != nil {
-					fmt.Println(err)
-					os.Exit(1)
+					fatal(err)
 				}
 
 				lockFile.Packages[lookup.Name] = lockfile.LockedPackage{
@@ -63,21 +60,17 @@ var installCmd = &cobra.Command{
 
 			lockFile.ContentHash, err = lockfile.ComputeHash(m.Require)
 			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
+				fatal(err)
 			}
 
 			err = lockfile.Save(lockFile)
 			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
+				fatal(err)
 			}
 		}
 
-		err = os.RemoveAll(m.AddonsPath)
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+		if err = os.RemoveAll(m.AddonsPath); err != nil {
+			fatal(err)
 		}
 
 		fmt.Println("Install")
@@ -86,14 +79,12 @@ var installCmd = &cobra.Command{
 			fmt.Printf("cloning %s@%s\n", name, lockedPackage.Version)
 			inst, err := installer.New(lockedPackage.Type)
 			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
+				fatal(err)
 			}
 
 			err = inst.Install(m.AddonsPath, name, lockedPackage)
 			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
+				fatal(err)
 			}
 			fmt.Printf("cloned %s@%s\n", name, lockedPackage.Version)
 		}

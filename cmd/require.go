@@ -5,7 +5,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -31,8 +30,7 @@ var requireCmd = &cobra.Command{
 
 		m, err := manifest.Load()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			fatal(err)
 		}
 
 		indexProvider := index.StaticProvider{
@@ -41,13 +39,11 @@ var requireCmd = &cobra.Command{
 
 		lookup, err := indexProvider.Lookup(addonName, version)
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			fatal(err)
 		}
 
 		if err := m.AddRequirement(lookup.Name, lookup.Version); err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			fatal(err)
 		}
 
 		lockFile := lockfile.LoadOrNew()
@@ -60,25 +56,21 @@ var requireCmd = &cobra.Command{
 
 		lockFile.ContentHash, err = lockfile.ComputeHash(m.Require)
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			fatal(err)
 		}
 
 		err = lockfile.Save(lockFile)
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			fatal(err)
 		}
 
 		inst, err := installer.New(lookup.Type)
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			fatal(err)
 		}
 		err = inst.Install(m.AddonsPath, lookup.Name, lockFile.Packages[lookup.Name])
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			fatal(err)
 		}
 
 		fmt.Printf("Added %s@%s\n", lookup.Name, lookup.Version)
