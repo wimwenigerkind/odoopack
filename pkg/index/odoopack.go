@@ -7,24 +7,24 @@ import (
 	"net/http"
 )
 
-type StaticProvider struct {
+type OdoopackProvider struct {
 	Endpoint string
 }
 
-type staticResponse struct {
-	Addons map[string]staticAddon `json:"addons"`
+type odoopackResponse struct {
+	Addons map[string]odoopackAddon `json:"addons"`
 }
 
-type staticAddon struct {
-	Versions map[string]staticVersion `json:"versions"`
+type odoopackAddon struct {
+	Versions map[string]odoopackVersion `json:"versions"`
 }
 
-type staticVersion struct {
-	Type       Type   `json:"type"`
+type odoopackVersion struct {
+	Type       string `json:"type"`
 	Repository string `json:"repository"`
 }
 
-func (p *StaticProvider) Lookup(name, version string) (AddonVersion, error) {
+func (p *OdoopackProvider) Lookup(name, version string) (AddonVersion, error) {
 	response, err := http.Get(p.Endpoint)
 	if err != nil {
 		return AddonVersion{}, err
@@ -36,15 +36,15 @@ func (p *StaticProvider) Lookup(name, version string) (AddonVersion, error) {
 		return AddonVersion{}, err
 	}
 
-	var index staticResponse
-	err = json.Unmarshal(body, &index)
+	var idx odoopackResponse
+	err = json.Unmarshal(body, &idx)
 	if err != nil {
 		return AddonVersion{}, err
 	}
 
-	addon, ok := index.Addons[name]
+	addon, ok := idx.Addons[name]
 	if !ok {
-		return AddonVersion{}, fmt.Errorf("addon %q not found in index", name)
+		return AddonVersion{}, fmt.Errorf("addon %q not found in index %s", name, p.Endpoint)
 	}
 
 	ver, ok := addon.Versions[version]

@@ -1,11 +1,9 @@
 package lockfile
 
-import "github.com/wimwenigerkind/odoopack/pkg/index"
-
 type LockedPackage struct {
-	Version    string     `json:"version"`
-	Type       index.Type `json:"type"`
-	Repository string     `json:"repository"`
+	Version    string `json:"version"`
+	Type       string `json:"type"`
+	Repository string `json:"repository"`
 }
 
 type LockFile struct {

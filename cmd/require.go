@@ -33,11 +33,7 @@ var requireCmd = &cobra.Command{
 			fatal(err)
 		}
 
-		indexProvider := index.StaticProvider{
-			Endpoint: m.Indexes["default"].Url,
-		}
-
-		lookup, err := indexProvider.Lookup(addonName, version)
+		lookup, err := index.Lookup(m.Indexes, addonName, version)
 		if err != nil {
 			fatal(err)
 		}

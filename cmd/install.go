@@ -8,7 +8,6 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/wimwenigerkind/odoopack/pkg/index"
 	"github.com/wimwenigerkind/odoopack/pkg/installer"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
@@ -30,10 +29,6 @@ var installCmd = &cobra.Command{
 			return
 		}
 
-		indexProvider := index.StaticProvider{
-			Endpoint: m.Indexes["default"].Url,
-		}
-
 		lock := lockfile.LoadOrNew()
 
 		isStale, err := lockfile.IsStale(m.Require, lock.ContentHash)
@@ -43,7 +38,7 @@ var installCmd = &cobra.Command{
 
 		if isStale {
 			fmt.Println("lockfile is stale")
-			lock, err = lockfile.RecomputeHash(m.Require, &indexProvider)
+			lock, err = lockfile.RecomputeHash(m.Require, m.Indexes)
 			if err != nil {
 				fatal(err)
 			}

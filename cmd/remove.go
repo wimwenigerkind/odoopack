@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/wimwenigerkind/odoopack/pkg/index"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
 )
@@ -44,11 +43,7 @@ var removeCmd = &cobra.Command{
 			fatal(err)
 		}
 
-		indexProvider := index.StaticProvider{
-			Endpoint: m.Indexes["default"].Url,
-		}
-
-		lock, err := lockfile.RecomputeHash(m.Require, &indexProvider)
+		lock, err := lockfile.RecomputeHash(m.Require, m.Indexes)
 		if err != nil {
 			fatal(err)
 		}

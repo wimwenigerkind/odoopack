@@ -3,7 +3,6 @@ package installer
 import (
 	"fmt"
 
-	"github.com/wimwenigerkind/odoopack/pkg/index"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 )
 
@@ -11,11 +10,11 @@ type Installer interface {
 	Install(targetDir string, addonName string, pkg lockfile.LockedPackage) error
 }
 
-func New(sourceType index.Type) (Installer, error) {
+func New(sourceType string) (Installer, error) {
 	switch sourceType {
-	case index.TypeGit:
+	case "git":
 		return NewGitInstaller(), nil
 	default:
-		return nil, fmt.Errorf("installer type is not supported")
+		return nil, fmt.Errorf("installer type %q is not supported", sourceType)
 	}
 }

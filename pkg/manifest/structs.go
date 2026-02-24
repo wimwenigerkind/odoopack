@@ -3,7 +3,8 @@ package manifest
 type Requirements map[string]string
 
 type Index struct {
-	Url string `json:"url"`
+	Url  string `json:"url"`
+	Type string `json:"type"`
 }
 
 type Indexes map[string]Index
@@ -20,7 +21,10 @@ func NewManifest(name string, indexURL string, addonsPath string) *Manifest {
 		Name:    name,
 		Require: make(Requirements),
 		Indexes: Indexes{
-			"default": Index{Url: indexURL},
+			"default": Index{
+				Url:  indexURL,
+				Type: "odoopack",
+			},
 		},
 		AddonsPath: addonsPath,
 	}
