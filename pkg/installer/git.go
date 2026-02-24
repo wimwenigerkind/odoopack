@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 )
@@ -40,9 +39,7 @@ func (i *GitInstaller) Install(targetDir string, addonName string, pkg lockfile.
 		return err
 	}
 
-	addonDir := strings.ReplaceAll(addonName, "/", "_")
-
-	dest := filepath.Join(targetDir, addonDir)
+	dest := filepath.Join(targetDir, FormatAddonDir(addonName))
 
 	err = os.MkdirAll(targetDir, 0755)
 	if err != nil {

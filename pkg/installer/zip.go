@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 )
@@ -45,13 +44,15 @@ func (i *ZipInstaller) Install(targetDir string, addonName string, pkg lockfile.
 		return fmt.Errorf("expected zip to contain a single root directory")
 	}
 
-	addonDir := strings.ReplaceAll(addonName, "/", "_")
-	dest := filepath.Join(targetDir, addonDir)
+	dest := filepath.Join(targetDir, FormatAddonDir(addonName))
 
 	if err := os.MkdirAll(targetDir, 0755); err != nil {
 		return err
 	}
-	os.RemoveAll(dest)
+	err = os.RemoveAll(dest)
+	if err != nil {
+		return err
+	}
 
 	return os.Rename(filepath.Join(tmpDir, entries[0].Name()), dest)
 }
@@ -71,6 +72,7 @@ func downloadToTmp(url string) (*os.File, error) {
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
+		os.Remove(tmp.Name())
 		return nil, fmt.Errorf("bad status %s", response.Status)
 	}
 

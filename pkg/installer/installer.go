@@ -2,6 +2,7 @@ package installer
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 )
@@ -19,4 +20,8 @@ func New(sourceType string) (Installer, error) {
 	default:
 		return nil, fmt.Errorf("installer type %q is not supported", sourceType)
 	}
+}
+
+func FormatAddonDir(name string) string {
+	return strings.ReplaceAll(name, "/", "_")
 }

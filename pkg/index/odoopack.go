@@ -31,6 +31,10 @@ func (p *OdoopackProvider) Lookup(name, version string) (AddonVersion, error) {
 	}
 	defer response.Body.Close()
 
+	if response.StatusCode != http.StatusOK {
+		return AddonVersion{}, fmt.Errorf("bad status %s", response.Status)
+	}
+
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return AddonVersion{}, err
