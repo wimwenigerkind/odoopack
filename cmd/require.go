@@ -16,9 +16,10 @@ import (
 )
 
 var requireCmd = &cobra.Command{
-	Use:   "require [addon]@[version]",
-	Short: "Add an addon dependency",
-	Args:  cobra.RangeArgs(1, 2),
+	Use:     "require [addon]@[version]",
+	Short:   "Add an addon dependency",
+	Aliases: []string{"add", "req"},
+	Args:    cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
 		addon := args[0]
 		addonParts := strings.Split(addon, "@")

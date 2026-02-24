@@ -15,9 +15,10 @@ import (
 )
 
 var installCmd = &cobra.Command{
-	Use:   "install",
-	Short: "Install all required addons",
-	Args:  cobra.NoArgs,
+	Use:     "install",
+	Short:   "Install all required addons",
+	Aliases: []string{"i"},
+	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		m, err := manifest.Load()
 		if err != nil {
