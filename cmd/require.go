@@ -42,7 +42,8 @@ var requireCmd = &cobra.Command{
 			fatal(err)
 		}
 
-		if err := m.AddRequirement(lookup.Name, lookup.Version); err != nil {
+		m.AddRequirement(lookup.Name, lookup.Version)
+		if err := manifest.Save(*m); err != nil {
 			fatal(err)
 		}
 

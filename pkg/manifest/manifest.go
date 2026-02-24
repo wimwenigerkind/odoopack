@@ -57,14 +57,12 @@ func Init(name string) (Manifest, error) {
 	return *manifest, nil
 }
 
-func (m *Manifest) AddRequirement(name, version string) error {
+func (m *Manifest) AddRequirement(name, version string) {
 	if m.Require == nil {
 		m.Require = make(Requirements)
 	}
 
 	m.Require[name] = version
-
-	return Save(*m)
 }
 
 func (m *Manifest) RemoveRequirement(name string) {
