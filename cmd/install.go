@@ -8,6 +8,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"github.com/wimwenigerkind/odoopack/pkg/installer"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
@@ -54,33 +55,52 @@ var installCmd = &cobra.Command{
 			fatal(err)
 		}
 
-		fmt.Println("Installing")
-
 		var wg sync.WaitGroup
 
 		errChan := make(chan error, len(lock.Packages))
 
-		for name, lockedPackage := range lock.Packages {
-			wg.Add(1)
-			go func(name string, pkg lockfile.LockedPackage) {
-				defer wg.Done()
-				fmt.Printf("installing %s@%s\n", name, pkg.Version)
+		multi := pterm.DefaultMultiPrinter
 
-				inst, err := installer.New(pkg.Type)
+		type job struct {
+			name    string
+			pkg     lockfile.LockedPackage
+			spinner *pterm.SpinnerPrinter
+		}
+
+		var jobs []job
+		for name, lockedPackage := range lock.Packages {
+			spinner, _ := pterm.DefaultSpinner.WithWriter(multi.NewWriter()).Start("installing " + name + "@" + lockedPackage.Version)
+			jobs = append(jobs, job{name: name, pkg: lockedPackage, spinner: spinner})
+		}
+
+		multi.Start()
+
+		for _, j := range jobs {
+			wg.Add(1)
+			go func(j job) {
+				defer wg.Done()
+
+				inst, err := installer.New(j.pkg.Type)
 				if err != nil {
+					j.spinner.Fail()
 					errChan <- err
 					return
 				}
 
-				err = inst.Install(m.AddonsPath, name, pkg)
+				err = inst.Install(m.AddonsPath, j.name, j.pkg)
 				if err != nil {
+					j.spinner.Fail()
 					errChan <- err
+					return
 				}
-			}(name, lockedPackage)
+				j.spinner.Success()
+			}(j)
 		}
 
 		wg.Wait()
 		close(errChan)
+
+		multi.Stop()
 
 		if len(errChan) > 0 {
 			fmt.Println("errors occurred, quitting:")
@@ -89,8 +109,6 @@ var installCmd = &cobra.Command{
 			}
 			os.Exit(1)
 		}
-
-		fmt.Println("Installed")
 	},
 }
 
