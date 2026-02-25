@@ -32,6 +32,12 @@ homebrew_casks:
     homepage: "https://github.com/wimwenigerkind/odoopack"
     description: "Package manager for Odoo 19 addons"
     license: "MIT"
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/odoopack"]
+          end
 
 archives:
   - formats: [tar.gz]
