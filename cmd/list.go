@@ -6,6 +6,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
 )
@@ -25,10 +26,13 @@ var listCmd = &cobra.Command{
 			return
 		}
 
-		fmt.Println("Installed")
+		data := pterm.TableData{{"Name", "Version", "Installed"}}
 		for name, version := range m.Require {
-			fmt.Println("-", name+"@"+version)
+			data = append(data, []string{name, version, "true"})
 		}
+
+		table := pterm.DefaultTable.WithHasHeader().WithData(data)
+		table.Render()
 	},
 }
 
