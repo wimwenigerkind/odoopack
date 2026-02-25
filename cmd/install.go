@@ -6,6 +6,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/spf13/cobra"
 	"github.com/wimwenigerkind/odoopack/pkg/installer"
@@ -53,20 +54,40 @@ var installCmd = &cobra.Command{
 			fatal(err)
 		}
 
-		fmt.Println("Install")
+		fmt.Println("Installing")
+
+		var wg sync.WaitGroup
+
+		errChan := make(chan error, len(lock.Packages))
 
 		for name, lockedPackage := range lock.Packages {
-			fmt.Printf("cloning %s@%s\n", name, lockedPackage.Version)
-			inst, err := installer.New(lockedPackage.Type)
-			if err != nil {
-				fatal(err)
-			}
+			wg.Add(1)
+			go func(name string, pkg lockfile.LockedPackage) {
+				defer wg.Done()
+				fmt.Printf("installing %s@%s\n", name, pkg.Version)
 
-			err = inst.Install(m.AddonsPath, name, lockedPackage)
-			if err != nil {
-				fatal(err)
+				inst, err := installer.New(pkg.Type)
+				if err != nil {
+					errChan <- err
+					return
+				}
+
+				err = inst.Install(m.AddonsPath, name, pkg)
+				if err != nil {
+					errChan <- err
+				}
+			}(name, lockedPackage)
+		}
+
+		wg.Wait()
+		close(errChan)
+
+		if len(errChan) > 0 {
+			fmt.Println("errors occurred, quitting:")
+			for err := range errChan {
+				fmt.Println("error while installing:", err)
 			}
-			fmt.Printf("cloned %s@%s\n", name, lockedPackage.Version)
+			os.Exit(1)
 		}
 
 		fmt.Println("Installed")
