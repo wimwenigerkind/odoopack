@@ -23,6 +23,16 @@ builds:
       - windows
       - darwin
 
+homebrew_casks:
+  - repository:
+      owner: wimwenigerkind
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: "https://github.com/wimwenigerkind/odoopack"
+    description: "Package manager for Odoo 19 addons"
+    license: "MIT"
+
 archives:
   - formats: [tar.gz]
     # this name template makes the OS and Arch compatible with the results of `uname`.
