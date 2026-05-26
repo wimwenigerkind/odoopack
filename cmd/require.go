@@ -51,7 +51,7 @@ var requireCmd = &cobra.Command{
 			Repository: lookup.Repository,
 		}
 
-		lockFile.ContentHash, err = lockfile.ComputeHash(m.Require)
+		lockFile.ContentHash, err = lockfile.ComputeHash(m.Require, m.Indexes)
 		if err != nil {
 			fatal(err)
 		}

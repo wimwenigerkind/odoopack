@@ -33,10 +33,10 @@ var removeCmd = &cobra.Command{
 			return
 		}
 
-		if m.Require[addonName] == "" {
+		version, ok := m.Require[addonName]
+		if !ok {
 			fatal(fmt.Errorf("addon is not installed"))
 		}
-		version := m.Require[addonName]
 
 		m.RemoveRequirement(addonName)
 		if err := manifest.Save(*m); err != nil {
@@ -46,7 +46,7 @@ var removeCmd = &cobra.Command{
 		lock := lockfile.LoadOrNew()
 		delete(lock.Packages, addonName)
 
-		lock.ContentHash, err = lockfile.ComputeHash(m.Require)
+		lock.ContentHash, err = lockfile.ComputeHash(m.Require, m.Indexes)
 		if err != nil {
 			fatal(err)
 		}

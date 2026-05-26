@@ -18,6 +18,10 @@ func NewZipInstaller() *ZipInstaller {
 }
 
 func (i *ZipInstaller) Install(targetDir string, addonName string, pkg lockfile.LockedPackage) error {
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
+		return err
+	}
+
 	tmp, err := downloadToTmp(pkg.Repository)
 	if err != nil {
 		return err
@@ -26,7 +30,7 @@ func (i *ZipInstaller) Install(targetDir string, addonName string, pkg lockfile.
 	tmp.Close()
 	defer os.Remove(tmpPath)
 
-	tmpDir, err := os.MkdirTemp("", "odoopack-unzip-*")
+	tmpDir, err := os.MkdirTemp(targetDir, ".odoopack-unzip-*")
 	if err != nil {
 		return err
 	}
@@ -45,15 +49,9 @@ func (i *ZipInstaller) Install(targetDir string, addonName string, pkg lockfile.
 	}
 
 	dest := filepath.Join(targetDir, FormatAddonDir(addonName))
-
-	if err := os.MkdirAll(targetDir, 0755); err != nil {
+	if err := os.RemoveAll(dest); err != nil {
 		return err
 	}
-	err = os.RemoveAll(dest)
-	if err != nil {
-		return err
-	}
-
 	return os.Rename(filepath.Join(tmpDir, entries[0].Name()), dest)
 }
 
@@ -63,9 +61,7 @@ func downloadToTmp(url string) (*os.File, error) {
 		return nil, err
 	}
 
-	client := &http.Client{}
-
-	response, err := client.Get(url)
+	response, err := http.Get(url)
 	if err != nil {
 		return nil, err
 	}

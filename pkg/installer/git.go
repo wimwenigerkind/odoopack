@@ -16,7 +16,11 @@ func NewGitInstaller() *GitInstaller {
 }
 
 func (i *GitInstaller) Install(targetDir string, addonName string, pkg lockfile.LockedPackage) error {
-	tmpDir, err := os.MkdirTemp("", "odoopack-*")
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
+		return err
+	}
+
+	tmpDir, err := os.MkdirTemp(targetDir, ".odoopack-tmp-*")
 	if err != nil {
 		return err
 	}
@@ -34,26 +38,13 @@ func (i *GitInstaller) Install(targetDir string, addonName string, pkg lockfile.
 		return fmt.Errorf("git clone failed: %s\n%s", err, string(output))
 	}
 
-	err = os.RemoveAll(filepath.Join(tmpDir, ".git"))
-	if err != nil {
+	if err := os.RemoveAll(filepath.Join(tmpDir, ".git")); err != nil {
 		return err
 	}
 
 	dest := filepath.Join(targetDir, FormatAddonDir(addonName))
-
-	err = os.MkdirAll(targetDir, 0755)
-	if err != nil {
+	if err := os.RemoveAll(dest); err != nil {
 		return err
 	}
-
-	err = os.RemoveAll(dest)
-	if err != nil {
-		return err
-	}
-
-	err = os.Rename(tmpDir, dest)
-	if err != nil {
-		return err
-	}
-	return nil
+	return os.Rename(tmpDir, dest)
 }

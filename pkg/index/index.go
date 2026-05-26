@@ -2,6 +2,7 @@ package index
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
 )
@@ -19,15 +20,22 @@ type Provider interface {
 
 func NewProvider(repoType, url string) (Provider, error) {
 	switch repoType {
-	case "odoopack":
-		return &OdoopackProvider{Endpoint: url}, nil
+	case "registry":
+		return &RegistryProvider{BaseURL: url}, nil
 	default:
 		return nil, fmt.Errorf("unknown repository type %q", repoType)
 	}
 }
 
 func Lookup(indexes manifest.Indexes, name, version string) (AddonVersion, error) {
-	for _, idx := range indexes {
+	keys := make([]string, 0, len(indexes))
+	for k := range indexes {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		idx := indexes[k]
 		provider, err := NewProvider(idx.Type, idx.Url)
 		if err != nil {
 			continue

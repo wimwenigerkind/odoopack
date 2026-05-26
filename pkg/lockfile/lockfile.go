@@ -46,6 +46,7 @@ func Load() (LockFile, error) {
 
 	return lockFile, nil
 }
+
 func Save(lockFile LockFile) error {
 	data, err := json.MarshalIndent(lockFile, "", "  ")
 	if err != nil {
@@ -54,8 +55,13 @@ func Save(lockFile LockFile) error {
 	return os.WriteFile(viper.GetString("lock"), data, 0644)
 }
 
-func ComputeHash(require map[string]string) (string, error) {
-	data, err := json.Marshal(require)
+func ComputeHash(require map[string]string, indexes manifest.Indexes) (string, error) {
+	payload := struct {
+		Require map[string]string `json:"require"`
+		Indexes manifest.Indexes  `json:"indexes"`
+	}{Require: require, Indexes: indexes}
+
+	data, err := json.Marshal(payload)
 	if err != nil {
 		return "", err
 	}
@@ -64,15 +70,12 @@ func ComputeHash(require map[string]string) (string, error) {
 	return fmt.Sprintf("sha256:%x", hash), nil
 }
 
-func IsStale(require map[string]string, hash string) (bool, error) {
-	computedHash, err := ComputeHash(require)
+func IsStale(require map[string]string, indexes manifest.Indexes, hash string) (bool, error) {
+	computedHash, err := ComputeHash(require, indexes)
 	if err != nil {
 		return false, err
 	}
-	if computedHash != hash {
-		return true, nil
-	}
-	return false, nil
+	return computedHash != hash, nil
 }
 
 func RecomputeHash(require map[string]string, indexes manifest.Indexes) (LockFile, error) {
@@ -91,15 +94,13 @@ func RecomputeHash(require map[string]string, indexes manifest.Indexes) (LockFil
 		}
 	}
 
-	lockFile := LockFile{
-		Packages: packages,
-	}
-
-	hash, err := ComputeHash(require)
+	hash, err := ComputeHash(require, indexes)
 	if err != nil {
 		return LockFile{}, err
 	}
-	lockFile.ContentHash = hash
 
-	return lockFile, nil
+	return LockFile{
+		ContentHash: hash,
+		Packages:    packages,
+	}, nil
 }

@@ -47,7 +47,7 @@ func init() {
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.odoopack.yaml)")
 
-	viper.SetDefault("index_url", "http://localhost:6969/static.json")
+	viper.SetDefault("index_url", "http://localhost:6969")
 	viper.SetDefault("addons_path", "addons/odoopack")
 	viper.SetDefault("manifest", "odoopack.json")
 	viper.SetDefault("lock", "odoopack.lock")

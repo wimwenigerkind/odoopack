@@ -23,7 +23,7 @@ func NewManifest(name string, indexURL string, addonsPath string) *Manifest {
 		Indexes: Indexes{
 			"default": Index{
 				Url:  indexURL,
-				Type: "odoopack",
+				Type: "registry",
 			},
 		},
 		AddonsPath: addonsPath,
