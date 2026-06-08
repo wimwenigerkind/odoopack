@@ -11,6 +11,7 @@ import (
 
 type RegistryProvider struct {
 	BaseURL string
+	Token   string
 }
 
 type registryAddon struct {
@@ -32,17 +33,33 @@ func (p *RegistryProvider) Lookup(name, version string) (AddonVersion, error) {
 		return AddonVersion{}, fmt.Errorf("invalid registry url: %w", err)
 	}
 
-	response, err := http.Get(endpoint.String())
+	req, err := http.NewRequest(http.MethodGet, endpoint.String(), nil)
+	if err != nil {
+		return AddonVersion{}, err
+	}
+	if p.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+p.Token)
+	}
+
+	response, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return AddonVersion{}, err
 	}
 	defer response.Body.Close()
 
-	if response.StatusCode == http.StatusNotFound {
-		return AddonVersion{}, fmt.Errorf("addon %q not found at %s", name, p.BaseURL)
-	}
-	if response.StatusCode != http.StatusOK {
-		return AddonVersion{}, fmt.Errorf("bad status %s", response.Status)
+	switch response.StatusCode {
+	case http.StatusOK:
+	case http.StatusUnauthorized:
+		return AddonVersion{}, fmt.Errorf("authentication required at %s — set ODOOPACK_AUTH", p.BaseURL)
+	case http.StatusForbidden:
+		return AddonVersion{}, fmt.Errorf("access denied at %s", p.BaseURL)
+	case http.StatusNotFound:
+		if p.Token == "" {
+			return AddonVersion{}, fmt.Errorf("addon %q not found at %s (set ODOOPACK_AUTH if the registry is private)", name, p.BaseURL)
+		}
+		return AddonVersion{}, fmt.Errorf("addon %q not found at %s (or your token has no access)", name, p.BaseURL)
+	default:
+		return AddonVersion{}, fmt.Errorf("registry %s returned %s", p.BaseURL, response.Status)
 	}
 
 	body, err := io.ReadAll(response.Body)

@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/wimwenigerkind/odoopack/pkg/auth"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 )
 
@@ -61,7 +62,14 @@ func downloadToTmp(url string) (*os.File, error) {
 		return nil, err
 	}
 
-	response, err := http.Get(url)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	if token := auth.TokenForURL(url); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	response, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

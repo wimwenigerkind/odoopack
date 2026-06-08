@@ -51,6 +51,8 @@ func init() {
 	viper.SetDefault("addons_path", "addons/odoopack")
 	viper.SetDefault("manifest", "odoopack.json")
 	viper.SetDefault("lock", "odoopack.lock")
+
+	_ = viper.BindEnv("auth", "ODOOPACK_AUTH")
 }
 
 func initConfig() {
