@@ -24,5 +24,14 @@ func TokenForURL(rawURL string) string {
 	if err != nil || u.Host == "" {
 		return ""
 	}
-	return cfg.Bearer[u.Host]
+	candidates := []string{
+		u.Host,
+		u.Scheme + "://" + u.Host,
+	}
+	for _, k := range candidates {
+		if v, ok := cfg.Bearer[k]; ok && v != "" {
+			return v
+		}
+	}
+	return ""
 }

@@ -59,7 +59,7 @@ func Lookup(indexes manifest.Indexes, name, version string) (AddonVersion, error
 	}
 
 	defaultURL := viper.GetString("default_index_url")
-	if defaultURL != "" && !indexesContainURL(indexes, defaultURL) {
+	if defaultURL != "" && shouldUseImplicitDefault(indexes, defaultURL) {
 		if result, ok := tryIndex("default", manifest.Index{Url: defaultURL, Type: "registry"}); ok {
 			return result, nil
 		}
@@ -71,11 +71,14 @@ func Lookup(indexes manifest.Indexes, name, version string) (AddonVersion, error
 	return AddonVersion{}, fmt.Errorf("addon %q@%s not found:\n  %s", name, version, strings.Join(attempts, "\n  "))
 }
 
-func indexesContainURL(indexes manifest.Indexes, url string) bool {
+func shouldUseImplicitDefault(indexes manifest.Indexes, defaultURL string) bool {
+	if _, hasDefault := indexes["default"]; hasDefault {
+		return false
+	}
 	for _, idx := range indexes {
-		if idx.Url == url {
-			return true
+		if idx.Url == defaultURL {
+			return false
 		}
 	}
-	return false
+	return true
 }

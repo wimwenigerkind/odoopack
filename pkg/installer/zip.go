@@ -77,7 +77,7 @@ func downloadToTmp(url string) (*os.File, error) {
 
 	if response.StatusCode != http.StatusOK {
 		os.Remove(tmp.Name())
-		return nil, fmt.Errorf("bad status %s", response.Status)
+		return nil, fmt.Errorf("download %s: bad status %s", url, response.Status)
 	}
 
 	if _, err = io.Copy(tmp, response.Body); err != nil {

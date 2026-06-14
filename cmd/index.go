@@ -99,7 +99,7 @@ var indexListCmd = &cobra.Command{
 		}
 
 		defaultURL := viper.GetString("default_index_url")
-		if defaultURL != "" && !indexesContainURL(m.Indexes, defaultURL) {
+		if defaultURL != "" && shouldShowImplicitDefault(m.Indexes, defaultURL) {
 			data = append(data, []string{"default", defaultURL, "registry", "implicit"})
 		}
 
@@ -112,13 +112,16 @@ var indexListCmd = &cobra.Command{
 	},
 }
 
-func indexesContainURL(indexes manifest.Indexes, url string) bool {
+func shouldShowImplicitDefault(indexes manifest.Indexes, defaultURL string) bool {
+	if _, hasDefault := indexes["default"]; hasDefault {
+		return false
+	}
 	for _, idx := range indexes {
-		if idx.Url == url {
-			return true
+		if idx.Url == defaultURL {
+			return false
 		}
 	}
-	return false
+	return true
 }
 
 func init() {
