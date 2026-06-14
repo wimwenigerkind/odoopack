@@ -39,6 +39,23 @@ homebrew_casks:
             system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/odoopack"]
           end
 
+dockers_v2:
+  - id: odoopack
+    dockerfile: Dockerfile
+    images:
+      - "ghcr.io/wimwenigerkind/odoopack"
+    tags:
+      - "{{ .Version }}"
+      - "{{ if not .Prerelease }}latest{{ end }}"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    annotations:
+      "org.opencontainers.image.source": "https://github.com/wimwenigerkind/odoopack"
+      "org.opencontainers.image.description": "Package manager for Odoo 19 addons"
+      "org.opencontainers.image.licenses": "MIT"
+      "org.opencontainers.image.version": "{{ .Version }}"
+
 archives:
   - formats: [tar.gz]
     # this name template makes the OS and Arch compatible with the results of `uname`.
