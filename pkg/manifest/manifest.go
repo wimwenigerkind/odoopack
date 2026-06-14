@@ -48,7 +48,7 @@ func Init(name string) (Manifest, error) {
 		return Manifest{}, fmt.Errorf("odoopack.json already exists")
 	}
 
-	manifest := NewManifest(name, viper.GetString("index_url"), viper.GetString("addons_path"))
+	manifest := NewManifest(name, viper.GetString("addons_path"))
 
 	if err := Save(*manifest); err != nil {
 		return Manifest{}, err

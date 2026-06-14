@@ -16,16 +16,11 @@ type Manifest struct {
 	AddonsPath string       `json:"addons_path"`
 }
 
-func NewManifest(name string, indexURL string, addonsPath string) *Manifest {
+func NewManifest(name string, addonsPath string) *Manifest {
 	return &Manifest{
-		Name:    name,
-		Require: make(Requirements),
-		Indexes: Indexes{
-			"default": Index{
-				Url:  indexURL,
-				Type: "registry",
-			},
-		},
+		Name:       name,
+		Require:    make(Requirements),
+		Indexes:    Indexes{},
 		AddonsPath: addonsPath,
 	}
 }

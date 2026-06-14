@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/spf13/viper"
 	"github.com/wimwenigerkind/odoopack/pkg/auth"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
 )
@@ -37,21 +38,44 @@ func Lookup(indexes manifest.Indexes, name, version string) (AddonVersion, error
 	sort.Strings(keys)
 
 	var attempts []string
-	for _, k := range keys {
-		idx := indexes[k]
+	tryIndex := func(label string, idx manifest.Index) (AddonVersion, bool) {
 		provider, err := NewProvider(idx.Type, idx.Url, auth.TokenForURL(idx.Url))
 		if err != nil {
-			attempts = append(attempts, fmt.Sprintf("%s[%s]: %v", k, idx.Url, err))
-			continue
+			attempts = append(attempts, fmt.Sprintf("%s[%s]: %v", label, idx.Url, err))
+			return AddonVersion{}, false
 		}
 		result, err := provider.Lookup(name, version)
 		if err == nil {
+			return result, true
+		}
+		attempts = append(attempts, fmt.Sprintf("%s[%s]: %v", label, idx.Url, err))
+		return AddonVersion{}, false
+	}
+
+	for _, k := range keys {
+		if result, ok := tryIndex(k, indexes[k]); ok {
 			return result, nil
 		}
-		attempts = append(attempts, fmt.Sprintf("%s[%s]: %v", k, idx.Url, err))
 	}
+
+	defaultURL := viper.GetString("default_index_url")
+	if defaultURL != "" && !indexesContainURL(indexes, defaultURL) {
+		if result, ok := tryIndex("default", manifest.Index{Url: defaultURL, Type: "registry"}); ok {
+			return result, nil
+		}
+	}
+
 	if len(attempts) == 0 {
 		return AddonVersion{}, fmt.Errorf("addon %q@%s: no indexes configured", name, version)
 	}
 	return AddonVersion{}, fmt.Errorf("addon %q@%s not found:\n  %s", name, version, strings.Join(attempts, "\n  "))
+}
+
+func indexesContainURL(indexes manifest.Indexes, url string) bool {
+	for _, idx := range indexes {
+		if idx.Url == url {
+			return true
+		}
+	}
+	return false
 }
