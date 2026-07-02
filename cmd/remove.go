@@ -46,7 +46,7 @@ var removeCmd = &cobra.Command{
 		lock := lockfile.LoadOrNew()
 		delete(lock.Packages, addonName)
 
-		lock.ContentHash, err = lockfile.ComputeHash(m.Require, m.Indexes)
+		lock.ContentHash, err = lockfile.ComputeHash(m.Require, m.Indexes, lock.Packages)
 		if err != nil {
 			fatal(err)
 		}

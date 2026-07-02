@@ -20,14 +20,14 @@ type registryAddon struct {
 }
 
 type registryVersion struct {
-	Version string `json:"version"`
-	Type    string `json:"type"`
-	URL     string `json:"url"`
-	Shasum  string `json:"shasum,omitempty"`
-	Ref     string `json:"ref,omitempty"`
+	Version   string `json:"version"`
+	Type      string `json:"type"`
+	URL       string `json:"url"`
+	Shasum    string `json:"shasum,omitempty"`
+	Reference string `json:"reference,omitempty"`
 }
 
-func (p *RegistryProvider) Lookup(name, version string) (AddonVersion, error) {
+func (p *RegistryProvider) Lookup(name, constraint string) (AddonVersion, error) {
 	endpoint, err := url.Parse(strings.TrimRight(p.BaseURL, "/") + "/registry/v1/addons/" + name)
 	if err != nil {
 		return AddonVersion{}, fmt.Errorf("invalid registry url: %w", err)
@@ -72,15 +72,16 @@ func (p *RegistryProvider) Lookup(name, version string) (AddonVersion, error) {
 		return AddonVersion{}, err
 	}
 
-	for _, v := range addon.Versions {
-		if v.Version == version {
-			return AddonVersion{
-				Name:       addon.Name,
-				Version:    v.Version,
-				Type:       v.Type,
-				Repository: v.URL,
-			}, nil
-		}
+	match, err := resolveVersion(constraint, addon.Versions)
+	if err != nil {
+		return AddonVersion{}, fmt.Errorf("%s: %w", name, err)
 	}
-	return AddonVersion{}, fmt.Errorf("version %q not found for addon %q", version, name)
+	return AddonVersion{
+		Name:       addon.Name,
+		Version:    match.Version,
+		Type:       match.Type,
+		Repository: match.URL,
+		Reference:  match.Reference,
+		Shasum:     match.Shasum,
+	}, nil
 }

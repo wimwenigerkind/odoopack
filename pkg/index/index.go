@@ -15,10 +15,12 @@ type AddonVersion struct {
 	Version    string
 	Type       string
 	Repository string
+	Reference  string
+	Shasum     string
 }
 
 type Provider interface {
-	Lookup(name, version string) (AddonVersion, error)
+	Lookup(name, constraint string) (AddonVersion, error)
 }
 
 func NewProvider(repoType, url, token string) (Provider, error) {
@@ -30,7 +32,7 @@ func NewProvider(repoType, url, token string) (Provider, error) {
 	}
 }
 
-func Lookup(indexes manifest.Indexes, name, version string) (AddonVersion, error) {
+func Lookup(indexes manifest.Indexes, name, constraint string) (AddonVersion, error) {
 	keys := make([]string, 0, len(indexes))
 	for k := range indexes {
 		keys = append(keys, k)
@@ -44,7 +46,7 @@ func Lookup(indexes manifest.Indexes, name, version string) (AddonVersion, error
 			attempts = append(attempts, fmt.Sprintf("%s[%s]: %v", label, idx.Url, err))
 			return AddonVersion{}, false
 		}
-		result, err := provider.Lookup(name, version)
+		result, err := provider.Lookup(name, constraint)
 		if err == nil {
 			return result, true
 		}
@@ -66,9 +68,9 @@ func Lookup(indexes manifest.Indexes, name, version string) (AddonVersion, error
 	}
 
 	if len(attempts) == 0 {
-		return AddonVersion{}, fmt.Errorf("addon %q@%s: no indexes configured", name, version)
+		return AddonVersion{}, fmt.Errorf("addon %q@%s: no indexes configured", name, constraint)
 	}
-	return AddonVersion{}, fmt.Errorf("addon %q@%s not found:\n  %s", name, version, strings.Join(attempts, "\n  "))
+	return AddonVersion{}, fmt.Errorf("addon %q@%s not found:\n  %s", name, constraint, strings.Join(attempts, "\n  "))
 }
 
 func shouldUseImplicitDefault(indexes manifest.Indexes, defaultURL string) bool {

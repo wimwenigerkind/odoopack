@@ -55,11 +55,12 @@ func Save(lockFile LockFile) error {
 	return os.WriteFile(viper.GetString("lock"), data, 0644)
 }
 
-func ComputeHash(require map[string]string, indexes manifest.Indexes) (string, error) {
+func ComputeHash(require map[string]string, indexes manifest.Indexes, packages map[string]LockedPackage) (string, error) {
 	payload := struct {
-		Require map[string]string `json:"require"`
-		Indexes manifest.Indexes  `json:"indexes"`
-	}{Require: require, Indexes: indexes}
+		Require  map[string]string        `json:"require"`
+		Indexes  manifest.Indexes         `json:"indexes"`
+		Packages map[string]LockedPackage `json:"packages"`
+	}{Require: require, Indexes: indexes, Packages: packages}
 
 	data, err := json.Marshal(payload)
 	if err != nil {
@@ -70,8 +71,8 @@ func ComputeHash(require map[string]string, indexes manifest.Indexes) (string, e
 	return fmt.Sprintf("sha256:%x", hash), nil
 }
 
-func IsStale(require map[string]string, indexes manifest.Indexes, hash string) (bool, error) {
-	computedHash, err := ComputeHash(require, indexes)
+func IsStale(require map[string]string, indexes manifest.Indexes, packages map[string]LockedPackage, hash string) (bool, error) {
+	computedHash, err := ComputeHash(require, indexes, packages)
 	if err != nil {
 		return false, err
 	}
@@ -88,13 +89,17 @@ func RecomputeHash(require map[string]string, indexes manifest.Indexes) (LockFil
 		}
 
 		packages[lookup.Name] = LockedPackage{
-			Version:    lookup.Version,
-			Type:       lookup.Type,
-			Repository: lookup.Repository,
+			Version: lookup.Version,
+			Dist: Dist{
+				Type:      lookup.Type,
+				URL:       lookup.Repository,
+				Reference: lookup.Reference,
+				Shasum:    lookup.Shasum,
+			},
 		}
 	}
 
-	hash, err := ComputeHash(require, indexes)
+	hash, err := ComputeHash(require, indexes, packages)
 	if err != nil {
 		return LockFile{}, err
 	}

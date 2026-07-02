@@ -1,9 +1,15 @@
 package lockfile
 
+type Dist struct {
+	Type      string `json:"type"`
+	URL       string `json:"url"`
+	Reference string `json:"reference,omitempty"`
+	Shasum    string `json:"shasum,omitempty"`
+}
+
 type LockedPackage struct {
-	Version    string `json:"version"`
-	Type       string `json:"type"`
-	Repository string `json:"repository"`
+	Version string `json:"version"`
+	Dist    Dist   `json:"dist"`
 }
 
 type LockFile struct {

@@ -1,3 +1,6 @@
 .idea
 odoopack/
 custom
+
+# Added by goreleaser init:
+dist/

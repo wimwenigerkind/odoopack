@@ -62,11 +62,15 @@ func updateOne(m *manifest.Manifest, name string) {
 
 	lock := lockfile.LoadOrNew()
 	lock.Packages[lookup.Name] = lockfile.LockedPackage{
-		Version:    lookup.Version,
-		Type:       lookup.Type,
-		Repository: lookup.Repository,
+		Version: lookup.Version,
+		Dist: lockfile.Dist{
+			Type:      lookup.Type,
+			URL:       lookup.Repository,
+			Reference: lookup.Reference,
+			Shasum:    lookup.Shasum,
+		},
 	}
-	lock.ContentHash, err = lockfile.ComputeHash(m.Require, m.Indexes)
+	lock.ContentHash, err = lockfile.ComputeHash(m.Require, m.Indexes, lock.Packages)
 	if err != nil {
 		fatal(err)
 	}

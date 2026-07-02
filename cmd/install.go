@@ -33,7 +33,7 @@ var installCmd = &cobra.Command{
 
 		lock := lockfile.LoadOrNew()
 
-		isStale, err := lockfile.IsStale(m.Require, m.Indexes, lock.ContentHash)
+		isStale, err := lockfile.IsStale(m.Require, m.Indexes, lock.Packages, lock.ContentHash)
 		if err != nil {
 			fatal(err)
 		}
@@ -82,7 +82,7 @@ func installAll(m *manifest.Manifest, lock lockfile.LockFile) error {
 	for _, j := range jobs {
 		j := j
 		eg.Go(func() error {
-			inst, err := installer.New(j.pkg.Type)
+			inst, err := installer.New(j.pkg.Dist.Type)
 			if err != nil {
 				j.spinner.Fail()
 				return fmt.Errorf("%s: %w", j.name, err)
@@ -99,7 +99,7 @@ func installAll(m *manifest.Manifest, lock lockfile.LockFile) error {
 }
 
 func installOne(m *manifest.Manifest, name string, pkg lockfile.LockedPackage) error {
-	inst, err := installer.New(pkg.Type)
+	inst, err := installer.New(pkg.Dist.Type)
 	if err != nil {
 		return err
 	}

@@ -1,12 +1,15 @@
 package installer
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/wimwenigerkind/odoopack/pkg/auth"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
@@ -23,13 +26,17 @@ func (i *ZipInstaller) Install(targetDir string, addonName string, pkg lockfile.
 		return err
 	}
 
-	tmp, err := downloadToTmp(pkg.Repository)
+	tmp, err := downloadToTmp(pkg.Dist.URL)
 	if err != nil {
 		return err
 	}
 	tmpPath := tmp.Name()
 	tmp.Close()
 	defer os.Remove(tmpPath)
+
+	if err := verifyShasum(tmpPath, pkg.Dist.Shasum); err != nil {
+		return err
+	}
 
 	tmpDir, err := os.MkdirTemp(targetDir, ".odoopack-unzip-*")
 	if err != nil {
@@ -85,6 +92,31 @@ func downloadToTmp(url string) (*os.File, error) {
 	}
 
 	return tmp, nil
+}
+
+func verifyShasum(path, expected string) error {
+	if expected == "" {
+		return nil
+	}
+	algo, want, ok := strings.Cut(expected, ":")
+	if !ok || algo != "sha256" {
+		return fmt.Errorf("unsupported shasum format %q (want sha256:<hex>)", expected)
+	}
+
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return err
+	}
+	got := hex.EncodeToString(h.Sum(nil))
+	if !strings.EqualFold(got, want) {
+		return fmt.Errorf("shasum mismatch: got sha256:%s, expected %s — refusing to install a corrupt or tampered zipball", got, expected)
+	}
+	return nil
 }
 
 func unzip(zipPath, destDir string) error {

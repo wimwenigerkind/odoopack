@@ -30,7 +30,7 @@ func (i *GitInstaller) Install(targetDir string, addonName string, pkg lockfile.
 	if pkg.Version != "" && pkg.Version != "latest" {
 		args = append(args, "--branch", pkg.Version)
 	}
-	args = append(args, pkg.Repository, tmpDir)
+	args = append(args, pkg.Dist.URL, tmpDir)
 
 	cmd := exec.Command("git", args...)
 	output, err := cmd.CombinedOutput()
