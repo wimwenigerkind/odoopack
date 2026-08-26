@@ -23,5 +23,5 @@ func New(sourceType string) (Installer, error) {
 }
 
 func FormatAddonDir(name string) string {
-	return strings.ReplaceAll(name, "/", "_")
+	return strings.NewReplacer("/", "_", "-", "_").Replace(name)
 }

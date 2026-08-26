@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/wimwenigerkind/odoopack/pkg/installer"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
 )
@@ -56,7 +57,7 @@ var removeCmd = &cobra.Command{
 			fatal(err)
 		}
 
-		addonDir := strings.ReplaceAll(addonName, "/", "_")
+		addonDir := installer.FormatAddonDir(addonName)
 		err = os.RemoveAll(filepath.Join(m.AddonsPath, addonDir))
 		if err != nil {
 			fatal(err)
