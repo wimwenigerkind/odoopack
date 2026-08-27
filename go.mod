@@ -1,6 +1,6 @@
 module github.com/wimwenigerkind/odoopack
 
-go 1.25.4
+go 1.27.0
 
 require (
 	github.com/pterm/pterm v0.12.83
@@ -28,6 +28,7 @@ require (
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
+	github.com/wimwenigerkind/odoopack-semver v0.0.0-20260827211541-1f15691b59d7 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/sys v0.41.0 // indirect
