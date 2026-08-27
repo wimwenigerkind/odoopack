@@ -80,7 +80,6 @@ func installAll(m *manifest.Manifest, lock lockfile.LockFile) error {
 
 	var eg errgroup.Group
 	for _, j := range jobs {
-		j := j
 		eg.Go(func() error {
 			inst, err := installer.New(j.pkg.Dist.Type)
 			if err != nil {
