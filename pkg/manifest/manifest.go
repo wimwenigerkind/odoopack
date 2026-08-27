@@ -39,7 +39,7 @@ func Save(manifest Manifest) error {
 	return os.WriteFile(viper.GetString("manifest"), data, 0644)
 }
 
-func Init(name string) (Manifest, error) {
+func Init(name, odoo string) (Manifest, error) {
 	exists, err := helper.FileExists(viper.GetString("manifest"))
 	if err != nil {
 		return Manifest{}, err
@@ -48,7 +48,7 @@ func Init(name string) (Manifest, error) {
 		return Manifest{}, fmt.Errorf("odoopack.json already exists")
 	}
 
-	manifest := NewManifest(name, viper.GetString("addons_path"))
+	manifest := NewManifest(name, viper.GetString("addons_path"), odoo)
 
 	if err := Save(*manifest); err != nil {
 		return Manifest{}, err

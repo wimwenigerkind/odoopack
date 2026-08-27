@@ -11,13 +11,14 @@ import (
 )
 
 var name string
+var odoo string
 
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize a new odoopack project",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		m, err := manifest.Init(name)
+		m, err := manifest.Init(name, odoo)
 		if err != nil {
 			fatal(err)
 		}
@@ -28,4 +29,5 @@ var initCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(initCmd)
 	initCmd.Flags().StringVarP(&name, "name", "n", "odoopack", "Project name")
+	initCmd.Flags().StringVar(&odoo, "odoo", "19.0", "Target Odoo series")
 }

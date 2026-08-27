@@ -36,7 +36,7 @@ var updateCmd = &cobra.Command{
 }
 
 func updateAll(m *manifest.Manifest) {
-	lock, err := lockfile.RecomputeHash(m.Require, m.Indexes)
+	lock, err := lockfile.RecomputeHash(m.Require, m.Indexes, m.Odoo)
 	if err != nil {
 		fatal(err)
 	}
@@ -55,7 +55,7 @@ func updateOne(m *manifest.Manifest, name string) {
 		fatal(fmt.Errorf("%s is not a required addon", name))
 	}
 
-	lookup, err := index.Lookup(m.Indexes, name, version)
+	lookup, err := index.Lookup(m.Indexes, name, version, m.Odoo)
 	if err != nil {
 		fatal(err)
 	}

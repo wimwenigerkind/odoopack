@@ -20,7 +20,7 @@ type AddonVersion struct {
 }
 
 type Provider interface {
-	Lookup(name, constraint string) (AddonVersion, error)
+	Lookup(name, constraint, odooSeries string) (AddonVersion, error)
 }
 
 func NewProvider(repoType, url, token string) (Provider, error) {
@@ -32,7 +32,7 @@ func NewProvider(repoType, url, token string) (Provider, error) {
 	}
 }
 
-func Lookup(indexes manifest.Indexes, name, constraint string) (AddonVersion, error) {
+func Lookup(indexes manifest.Indexes, name, constraint, odooSeries string) (AddonVersion, error) {
 	keys := make([]string, 0, len(indexes))
 	for k := range indexes {
 		keys = append(keys, k)
@@ -46,7 +46,7 @@ func Lookup(indexes manifest.Indexes, name, constraint string) (AddonVersion, er
 			attempts = append(attempts, fmt.Sprintf("%s[%s]: %v", label, idx.Url, err))
 			return AddonVersion{}, false
 		}
-		result, err := provider.Lookup(name, constraint)
+		result, err := provider.Lookup(name, constraint, odooSeries)
 		if err == nil {
 			return result, true
 		}

@@ -27,7 +27,7 @@ type registryVersion struct {
 	Reference string `json:"reference,omitempty"`
 }
 
-func (p *RegistryProvider) Lookup(name, constraint string) (AddonVersion, error) {
+func (p *RegistryProvider) Lookup(name, constraint, odooSeries string) (AddonVersion, error) {
 	endpoint, err := url.Parse(strings.TrimRight(p.BaseURL, "/") + "/registry/v1/addons/" + name)
 	if err != nil {
 		return AddonVersion{}, fmt.Errorf("invalid registry url: %w", err)
@@ -72,7 +72,7 @@ func (p *RegistryProvider) Lookup(name, constraint string) (AddonVersion, error)
 		return AddonVersion{}, err
 	}
 
-	match, err := resolveVersion(constraint, addon.Versions)
+	match, err := resolveVersion(constraint, odooSeries, addon.Versions)
 	if err != nil {
 		return AddonVersion{}, fmt.Errorf("%s: %w", name, err)
 	}

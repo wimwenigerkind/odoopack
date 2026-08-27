@@ -79,11 +79,11 @@ func IsStale(require map[string]string, indexes manifest.Indexes, packages map[s
 	return computedHash != hash, nil
 }
 
-func RecomputeHash(require map[string]string, indexes manifest.Indexes) (LockFile, error) {
+func RecomputeHash(require map[string]string, indexes manifest.Indexes, odooSeries string) (LockFile, error) {
 	packages := make(map[string]LockedPackage)
 
 	for name, version := range require {
-		lookup, err := index.Lookup(indexes, name, version)
+		lookup, err := index.Lookup(indexes, name, version, odooSeries)
 		if err != nil {
 			return LockFile{}, err
 		}

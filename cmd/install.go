@@ -40,7 +40,7 @@ var installCmd = &cobra.Command{
 
 		if isStale {
 			fmt.Println("lockfile is stale")
-			lock, err = lockfile.RecomputeHash(m.Require, m.Indexes)
+			lock, err = lockfile.RecomputeHash(m.Require, m.Indexes, m.Odoo)
 			if err != nil {
 				fatal(err)
 			}

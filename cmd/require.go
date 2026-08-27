@@ -33,7 +33,7 @@ var requireCmd = &cobra.Command{
 			fatal(err)
 		}
 
-		lookup, err := index.Lookup(m.Indexes, addonName, constraint)
+		lookup, err := index.Lookup(m.Indexes, addonName, constraint, m.Odoo)
 		if err != nil {
 			fatal(err)
 		}
