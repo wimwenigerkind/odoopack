@@ -79,11 +79,28 @@ func IsStale(require map[string]string, indexes manifest.Indexes, packages map[s
 	return computedHash != hash, nil
 }
 
+type resolveItem struct {
+	name       string
+	constraint string
+	direct     bool
+}
+
 func RecomputeHash(require map[string]string, indexes manifest.Indexes, odooSeries string) (LockFile, error) {
 	packages := make(map[string]LockedPackage)
 
+	queue := make([]resolveItem, 0, len(require))
 	for name, version := range require {
-		lookup, err := index.Lookup(indexes, name, version, odooSeries)
+		queue = append(queue, resolveItem{name: name, constraint: version, direct: true})
+	}
+
+	for len(queue) > 0 {
+		item := queue[0]
+		queue = queue[1:]
+		if _, seen := packages[item.name]; seen {
+			continue
+		}
+
+		lookup, err := index.Lookup(indexes, item.name, item.constraint, odooSeries)
 		if err != nil {
 			return LockFile{}, err
 		}
@@ -96,6 +113,25 @@ func RecomputeHash(require map[string]string, indexes manifest.Indexes, odooSeri
 				Reference: lookup.Reference,
 				Shasum:    lookup.Shasum,
 			},
+			Direct: item.direct,
+		}
+
+		for _, dep := range lookup.Depends {
+			switch dep.Access {
+			case "forbidden":
+				return LockFile{}, fmt.Errorf("%s requires %q (module %s) which you cannot access on the registry", lookup.Name, dep.Package, dep.Module)
+			case "ok":
+				if dep.Package == "" {
+					continue
+				}
+				if _, seen := packages[dep.Package]; seen {
+					continue
+				}
+				if odooSeries == "" {
+					return LockFile{}, fmt.Errorf("cannot resolve transitive dependency %q without an Odoo series; set \"odoo\" in the manifest", dep.Package)
+				}
+				queue = append(queue, resolveItem{name: dep.Package, constraint: odooSeries, direct: false})
+			}
 		}
 	}
 

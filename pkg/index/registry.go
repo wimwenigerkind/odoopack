@@ -20,11 +20,18 @@ type registryAddon struct {
 }
 
 type registryVersion struct {
-	Version   string `json:"version"`
-	Type      string `json:"type"`
-	URL       string `json:"url"`
-	Shasum    string `json:"shasum,omitempty"`
-	Reference string `json:"reference,omitempty"`
+	Version   string        `json:"version"`
+	Type      string        `json:"type"`
+	URL       string        `json:"url"`
+	Shasum    string        `json:"shasum,omitempty"`
+	Reference string        `json:"reference,omitempty"`
+	Depends   []registryDep `json:"depends,omitempty"`
+}
+
+type registryDep struct {
+	Module  string `json:"module"`
+	Package string `json:"package,omitempty"`
+	Access  string `json:"access"`
 }
 
 func (p *RegistryProvider) Lookup(name, constraint, odooSeries string) (AddonVersion, error) {
@@ -76,6 +83,10 @@ func (p *RegistryProvider) Lookup(name, constraint, odooSeries string) (AddonVer
 	if err != nil {
 		return AddonVersion{}, fmt.Errorf("%s: %w", name, err)
 	}
+	deps := make([]Dep, 0, len(match.Depends))
+	for _, d := range match.Depends {
+		deps = append(deps, Dep{Module: d.Module, Package: d.Package, Access: d.Access})
+	}
 	return AddonVersion{
 		Name:       addon.Name,
 		Version:    match.Version,
@@ -83,5 +94,6 @@ func (p *RegistryProvider) Lookup(name, constraint, odooSeries string) (AddonVer
 		Repository: match.URL,
 		Reference:  match.Reference,
 		Shasum:     match.Shasum,
+		Depends:    deps,
 	}, nil
 }

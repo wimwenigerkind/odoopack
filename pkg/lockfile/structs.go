@@ -10,6 +10,7 @@ type Dist struct {
 type LockedPackage struct {
 	Version string `json:"version"`
 	Dist    Dist   `json:"dist"`
+	Direct  bool   `json:"direct"`
 }
 
 type LockFile struct {

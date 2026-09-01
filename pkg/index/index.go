@@ -17,6 +17,13 @@ type AddonVersion struct {
 	Repository string
 	Reference  string
 	Shasum     string
+	Depends    []Dep
+}
+
+type Dep struct {
+	Module  string
+	Package string
+	Access  string
 }
 
 type Provider interface {

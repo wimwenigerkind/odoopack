@@ -9,7 +9,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/wimwenigerkind/odoopack/pkg/index"
-	"github.com/wimwenigerkind/odoopack/pkg/installer"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
 )
@@ -43,38 +42,28 @@ var requireCmd = &cobra.Command{
 			fatal(err)
 		}
 
-		lockFile := lockfile.LoadOrNew()
+		oldLock := lockfile.LoadOrNew()
 
-		lockFile.Packages[lookup.Name] = lockfile.LockedPackage{
-			Version: lookup.Version,
-			Dist: lockfile.Dist{
-				Type:      lookup.Type,
-				URL:       lookup.Repository,
-				Reference: lookup.Reference,
-				Shasum:    lookup.Shasum,
-			},
-		}
-
-		lockFile.ContentHash, err = lockfile.ComputeHash(m.Require, m.Indexes, lockFile.Packages)
+		lockFile, err := lockfile.RecomputeHash(m.Require, m.Indexes, m.Odoo)
 		if err != nil {
 			fatal(err)
 		}
-
-		err = lockfile.Save(lockFile)
-		if err != nil {
+		if err := lockfile.Save(lockFile); err != nil {
 			fatal(err)
 		}
 
-		inst, err := installer.New(lookup.Type)
-		if err != nil {
-			fatal(err)
-		}
-		err = inst.Install(m.AddonsPath, lookup.Name, lockFile.Packages[lookup.Name])
-		if err != nil {
-			fatal(err)
+		added := 0
+		for name, pkg := range lockFile.Packages {
+			if _, existed := oldLock.Packages[name]; existed {
+				continue
+			}
+			if err := installOne(m, name, pkg); err != nil {
+				fatal(err)
+			}
+			added++
 		}
 
-		fmt.Printf("Added %s@%s\n", lookup.Name, lookup.Version)
+		fmt.Printf("Added %s@%s (%d package(s) installed)\n", lookup.Name, lookup.Version, added)
 	},
 }
 
