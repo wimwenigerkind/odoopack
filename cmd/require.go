@@ -20,16 +20,19 @@ var requireCmd = &cobra.Command{
 	Args:    cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
 		addon := args[0]
-		addonParts := strings.Split(addon, "@")
-		if len(addonParts) != 2 || addonParts[1] == "" {
-			fatal(fmt.Errorf("version required: use %s@<version> (e.g. 18.0.1.0.0 or dev-18.0)", addonParts[0]))
-		}
-		addonName := addonParts[0]
-		constraint := addonParts[1]
+		addonName, versionArg, _ := strings.Cut(addon, "@")
 
 		m, err := manifest.Load()
 		if err != nil {
 			fatal(err)
+		}
+
+		constraint := versionArg
+		if constraint == "" {
+			constraint = m.Odoo
+		}
+		if constraint == "" {
+			fatal(fmt.Errorf("no version given and no \"odoo\" series set in the manifest; use %s@<version> (e.g. 19.0.1.0.0 or dev-19.0)", addonName))
 		}
 
 		lookup, err := index.Lookup(m.Indexes, addonName, constraint, m.Odoo)
