@@ -23,6 +23,13 @@ package main
 
 import "github.com/wimwenigerkind/odoopack/cmd"
 
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
 func main() {
+	cmd.SetBuildInfo(version, commit, date)
 	cmd.Execute()
 }
