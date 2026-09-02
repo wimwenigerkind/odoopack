@@ -108,7 +108,7 @@ var indexListCmd = &cobra.Command{
 			return
 		}
 
-		pterm.DefaultTable.WithHasHeader().WithData(data).WithBoxed().Render()
+		_ = pterm.DefaultTable.WithHasHeader().WithData(data).WithBoxed().Render()
 	},
 }
 

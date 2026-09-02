@@ -24,7 +24,7 @@ func (i *GitInstaller) Install(targetDir string, addonName string, pkg lockfile.
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	args := []string{"clone", "--depth", "1"}
 	if pkg.Version != "" && pkg.Version != "latest" {

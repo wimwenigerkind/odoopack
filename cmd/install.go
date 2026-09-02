@@ -75,8 +75,8 @@ func installAll(m *manifest.Manifest, lock lockfile.LockFile) error {
 		jobs = append(jobs, job{name: name, pkg: lockedPackage, spinner: spinner})
 	}
 
-	multi.Start()
-	defer multi.Stop()
+	_, _ = multi.Start()
+	defer func() { _, _ = multi.Stop() }()
 
 	var eg errgroup.Group
 	for _, j := range jobs {

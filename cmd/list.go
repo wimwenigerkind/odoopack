@@ -34,7 +34,7 @@ var listCmd = &cobra.Command{
 			data = append(data, []string{name, version, installedStatus(m.AddonsPath, name)})
 		}
 
-		pterm.DefaultTable.WithHasHeader().WithData(data).WithBoxed().Render()
+		_ = pterm.DefaultTable.WithHasHeader().WithData(data).WithBoxed().Render()
 	},
 }
 

@@ -31,8 +31,8 @@ func (i *ZipInstaller) Install(targetDir string, addonName string, pkg lockfile.
 		return err
 	}
 	tmpPath := tmp.Name()
-	tmp.Close()
-	defer os.Remove(tmpPath)
+	_ = tmp.Close()
+	defer func() { _ = os.Remove(tmpPath) }()
 
 	if err := verifyShasum(tmpPath, pkg.Dist.Shasum); err != nil {
 		return err
@@ -42,7 +42,7 @@ func (i *ZipInstaller) Install(targetDir string, addonName string, pkg lockfile.
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	if err := unzip(tmpPath, tmpDir); err != nil {
 		return err
@@ -80,10 +80,10 @@ func downloadToTmp(url string) (*os.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 
 	if response.StatusCode != http.StatusOK {
-		os.Remove(tmp.Name())
+		_ = os.Remove(tmp.Name())
 		return nil, fmt.Errorf("download %s: bad status %s", url, response.Status)
 	}
 
@@ -107,7 +107,7 @@ func verifyShasum(path, expected string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {
 		return err

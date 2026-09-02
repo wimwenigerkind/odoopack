@@ -52,7 +52,7 @@ func (p *RegistryProvider) Lookup(name, constraint, odooSeries string) (AddonVer
 	if err != nil {
 		return AddonVersion{}, err
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 
 	switch response.StatusCode {
 	case http.StatusOK:
@@ -85,7 +85,7 @@ func (p *RegistryProvider) Lookup(name, constraint, odooSeries string) (AddonVer
 	}
 	deps := make([]Dep, 0, len(match.Depends))
 	for _, d := range match.Depends {
-		deps = append(deps, Dep{Module: d.Module, Package: d.Package, Access: d.Access})
+		deps = append(deps, Dep(d))
 	}
 	return AddonVersion{
 		Name:       addon.Name,
