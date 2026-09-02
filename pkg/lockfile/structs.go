@@ -8,9 +8,11 @@ type Dist struct {
 }
 
 type LockedPackage struct {
-	Version string `json:"version"`
-	Dist    Dist   `json:"dist"`
-	Direct  bool   `json:"direct"`
+	Version  string   `json:"version"`
+	Dist     Dist     `json:"dist"`
+	Direct   bool     `json:"direct"`
+	Depends  []string `json:"depends,omitempty"`
+	External []string `json:"external,omitempty"`
 }
 
 type LockFile struct {

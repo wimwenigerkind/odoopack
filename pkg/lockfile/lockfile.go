@@ -105,25 +105,18 @@ func RecomputeHash(require map[string]string, indexes manifest.Indexes, odooSeri
 			return LockFile{}, err
 		}
 
-		packages[lookup.Name] = LockedPackage{
-			Version: lookup.Version,
-			Dist: Dist{
-				Type:      lookup.Type,
-				URL:       lookup.Repository,
-				Reference: lookup.Reference,
-				Shasum:    lookup.Shasum,
-			},
-			Direct: item.direct,
-		}
-
+		var deps, external []string
 		for _, dep := range lookup.Depends {
 			switch dep.Access {
 			case "forbidden":
 				return LockFile{}, fmt.Errorf("%s requires %q (module %s) which you cannot access on the registry", lookup.Name, dep.Package, dep.Module)
+			case "external":
+				external = append(external, dep.Module)
 			case "ok":
 				if dep.Package == "" {
 					continue
 				}
+				deps = append(deps, dep.Package)
 				if _, seen := packages[dep.Package]; seen {
 					continue
 				}
@@ -132,6 +125,19 @@ func RecomputeHash(require map[string]string, indexes manifest.Indexes, odooSeri
 				}
 				queue = append(queue, resolveItem{name: dep.Package, constraint: odooSeries, direct: false})
 			}
+		}
+
+		packages[lookup.Name] = LockedPackage{
+			Version: lookup.Version,
+			Dist: Dist{
+				Type:      lookup.Type,
+				URL:       lookup.Repository,
+				Reference: lookup.Reference,
+				Shasum:    lookup.Shasum,
+			},
+			Direct:   item.direct,
+			Depends:  deps,
+			External: external,
 		}
 	}
 
