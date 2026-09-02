@@ -8,10 +8,10 @@ import (
 	"net/url"
 	"sort"
 
-	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
+	"github.com/wimwenigerkind/odoopack/pkg/ui"
 )
 
 var indexCmd = &cobra.Command{
@@ -49,7 +49,7 @@ var indexAddCmd = &cobra.Command{
 		if err := manifest.Save(*m); err != nil {
 			fatal(err)
 		}
-		pterm.Success.Printfln("added index %s %s (%s)", name, raw, indexAddType)
+		ui.Success("added index %s %s (%s)", name, raw, indexAddType)
 	},
 }
 
@@ -71,7 +71,7 @@ var indexRemoveCmd = &cobra.Command{
 		if err := manifest.Save(*m); err != nil {
 			fatal(err)
 		}
-		pterm.Success.Printfln("removed index %s", name)
+		ui.Success("removed index %s", name)
 	},
 }
 
@@ -86,29 +86,29 @@ var indexListCmd = &cobra.Command{
 			fatal(err)
 		}
 
-		data := pterm.TableData{{"Name", "URL", "Type", "Source"}}
-
 		names := make([]string, 0, len(m.Indexes))
 		for n := range m.Indexes {
 			names = append(names, n)
 		}
 		sort.Strings(names)
+
+		var rows [][]string
 		for _, n := range names {
 			idx := m.Indexes[n]
-			data = append(data, []string{n, idx.Url, idx.Type, "manifest"})
+			rows = append(rows, []string{n, idx.Url, idx.Type, "manifest"})
 		}
 
 		defaultURL := viper.GetString("default_index_url")
 		if defaultURL != "" && shouldShowImplicitDefault(m.Indexes, defaultURL) {
-			data = append(data, []string{"default", defaultURL, "registry", "implicit"})
+			rows = append(rows, []string{"default", defaultURL, "registry", "implicit"})
 		}
 
-		if len(data) == 1 {
-			pterm.Info.Println("no indexes configured")
+		if len(rows) == 0 {
+			ui.Info("no indexes configured")
 			return
 		}
 
-		_ = pterm.DefaultTable.WithHasHeader().WithData(data).WithBoxed().Render()
+		ui.Println(ui.Table([]string{"Name", "URL", "Type", "Source"}, rows))
 	},
 }
 

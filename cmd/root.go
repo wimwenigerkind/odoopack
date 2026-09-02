@@ -27,6 +27,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/wimwenigerkind/odoopack/pkg/ui"
 )
 
 var cfgFile string
@@ -75,6 +76,6 @@ func initConfig() {
 }
 
 func fatal(err error) {
-	fmt.Println(err)
+	ui.Error("%v", err)
 	os.Exit(1)
 }

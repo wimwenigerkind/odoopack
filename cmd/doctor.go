@@ -4,7 +4,6 @@ Copyright © 2026 Wim Wenigerkind
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"regexp"
 
@@ -12,6 +11,7 @@ import (
 	odoosemver "github.com/wimwenigerkind/odoopack-semver"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
+	"github.com/wimwenigerkind/odoopack/pkg/ui"
 )
 
 var seriesPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+$`)
@@ -21,9 +21,9 @@ var doctorCmd = &cobra.Command{
 	Short: "Check the project manifest and lockfile for problems",
 	Run: func(cmd *cobra.Command, args []string) {
 		var errs, warns int
-		ok := func(format string, a ...any) { fmt.Printf("  ok     %s\n", fmt.Sprintf(format, a...)) }
-		warn := func(format string, a ...any) { warns++; fmt.Printf("  warn   %s\n", fmt.Sprintf(format, a...)) }
-		bad := func(format string, a ...any) { errs++; fmt.Printf("  error  %s\n", fmt.Sprintf(format, a...)) }
+		ok := func(format string, a ...any) { ui.Success(format, a...) }
+		warn := func(format string, a ...any) { warns++; ui.Warn(format, a...) }
+		bad := func(format string, a ...any) { errs++; ui.Error(format, a...) }
 
 		m, err := manifest.Load()
 		if err != nil {
@@ -87,15 +87,15 @@ var doctorCmd = &cobra.Command{
 			ok("lockfile up to date (%d package(s))", len(lf.Packages))
 		}
 
-		fmt.Println()
+		ui.Println()
 		switch {
 		case errs > 0:
-			fmt.Printf("%d error(s), %d warning(s)\n", errs, warns)
+			ui.Error("%d error(s), %d warning(s)", errs, warns)
 			os.Exit(1)
 		case warns > 0:
-			fmt.Printf("no errors, %d warning(s)\n", warns)
+			ui.Warn("no errors, %d warning(s)", warns)
 		default:
-			fmt.Println("all checks passed")
+			ui.Success("all checks passed")
 		}
 	},
 }

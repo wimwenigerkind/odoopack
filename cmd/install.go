@@ -6,13 +6,13 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"sort"
 
-	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"github.com/wimwenigerkind/odoopack/pkg/installer"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
-	"golang.org/x/sync/errgroup"
+	"github.com/wimwenigerkind/odoopack/pkg/ui"
 )
 
 var installCmd = &cobra.Command{
@@ -27,7 +27,7 @@ var installCmd = &cobra.Command{
 		}
 
 		if len(m.Require) == 0 {
-			fmt.Println("no addons installed")
+			ui.Info("no addons required")
 			return
 		}
 
@@ -39,7 +39,7 @@ var installCmd = &cobra.Command{
 		}
 
 		if isStale {
-			fmt.Println("lockfile is stale")
+			ui.Info("lockfile is stale, resolving")
 			lock, err = lockfile.RecomputeHash(m.Require, m.Indexes, m.Odoo)
 			if err != nil {
 				fatal(err)
@@ -50,9 +50,10 @@ var installCmd = &cobra.Command{
 		}
 
 		if err := installAll(m, lock); err != nil {
-			fmt.Println("error while installing:", err)
+			ui.Error("install failed: %v", err)
 			os.Exit(1)
 		}
+		ui.Success("installed %d package(s)", len(lock.Packages))
 	},
 }
 
@@ -61,40 +62,24 @@ func installAll(m *manifest.Manifest, lock lockfile.LockFile) error {
 		return err
 	}
 
-	multi := pterm.DefaultMultiPrinter
+	names := make([]string, 0, len(lock.Packages))
+	for name := range lock.Packages {
+		names = append(names, name)
+	}
+	sort.Strings(names)
 
-	type job struct {
-		name    string
-		pkg     lockfile.LockedPackage
-		spinner *pterm.SpinnerPrinter
+	tasks := make([]ui.Task, len(names))
+	for i, name := range names {
+		tasks[i] = ui.Task{Label: name + "@" + lock.Packages[name].Version}
 	}
 
-	jobs := make([]job, 0, len(lock.Packages))
-	for name, lockedPackage := range lock.Packages {
-		spinner, _ := pterm.DefaultSpinner.WithWriter(multi.NewWriter()).Start("installing " + name + "@" + lockedPackage.Version)
-		jobs = append(jobs, job{name: name, pkg: lockedPackage, spinner: spinner})
-	}
-
-	_, _ = multi.Start()
-	defer func() { _, _ = multi.Stop() }()
-
-	var eg errgroup.Group
-	for _, j := range jobs {
-		eg.Go(func() error {
-			inst, err := installer.New(j.pkg.Dist.Type)
-			if err != nil {
-				j.spinner.Fail()
-				return fmt.Errorf("%s: %w", j.name, err)
-			}
-			if err := inst.Install(m.AddonsPath, j.name, j.pkg); err != nil {
-				j.spinner.Fail()
-				return fmt.Errorf("%s: %w", j.name, err)
-			}
-			j.spinner.Success()
-			return nil
-		})
-	}
-	return eg.Wait()
+	return ui.RunTasks(fmt.Sprintf("installing %d package(s)", len(names)), tasks, func(i int) error {
+		name := names[i]
+		if err := installOne(m, name, lock.Packages[name]); err != nil {
+			return fmt.Errorf("%s: %w", name, err)
+		}
+		return nil
+	})
 }
 
 func installOne(m *manifest.Manifest, name string, pkg lockfile.LockedPackage) error {

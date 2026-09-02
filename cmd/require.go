@@ -11,6 +11,7 @@ import (
 	"github.com/wimwenigerkind/odoopack/pkg/index"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
+	"github.com/wimwenigerkind/odoopack/pkg/ui"
 )
 
 var requireCmd = &cobra.Command{
@@ -66,7 +67,7 @@ var requireCmd = &cobra.Command{
 			added++
 		}
 
-		fmt.Printf("Added %s@%s (%d package(s) installed)\n", lookup.Name, lookup.Version, added)
+		ui.Success("added %s@%s (%d package(s) installed)", lookup.Name, lookup.Version, added)
 	},
 }
 

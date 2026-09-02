@@ -4,14 +4,14 @@ Copyright © 2026 Wim
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
-	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"github.com/wimwenigerkind/odoopack/pkg/installer"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
+	"github.com/wimwenigerkind/odoopack/pkg/ui"
 )
 
 var listCmd = &cobra.Command{
@@ -25,16 +25,22 @@ var listCmd = &cobra.Command{
 		}
 
 		if len(m.Require) == 0 {
-			fmt.Println("no addons installed")
+			ui.Info("no addons required")
 			return
 		}
 
-		data := pterm.TableData{{"Name", "Version", "Installed"}}
-		for name, version := range m.Require {
-			data = append(data, []string{name, version, installedStatus(m.AddonsPath, name)})
+		names := make([]string, 0, len(m.Require))
+		for name := range m.Require {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+
+		var rows [][]string
+		for _, name := range names {
+			rows = append(rows, []string{name, m.Require[name], installedStatus(m.AddonsPath, name)})
 		}
 
-		_ = pterm.DefaultTable.WithHasHeader().WithData(data).WithBoxed().Render()
+		ui.Println(ui.Table([]string{"Name", "Version", "Installed"}, rows))
 	},
 }
 

@@ -4,10 +4,9 @@ Copyright © 2026 Wim Wenigerkind
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
+	"github.com/wimwenigerkind/odoopack/pkg/ui"
 )
 
 var name string
@@ -22,7 +21,7 @@ var initCmd = &cobra.Command{
 		if err != nil {
 			fatal(err)
 		}
-		fmt.Printf("Initialized project %q\n", m.Name)
+		ui.Success("initialized project %q", m.Name)
 	},
 }
 

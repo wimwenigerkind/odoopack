@@ -10,6 +10,7 @@ import (
 	"github.com/wimwenigerkind/odoopack/pkg/index"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
+	"github.com/wimwenigerkind/odoopack/pkg/ui"
 )
 
 var updateCmd = &cobra.Command{
@@ -23,7 +24,7 @@ var updateCmd = &cobra.Command{
 			fatal(err)
 		}
 		if len(m.Require) == 0 {
-			fmt.Println("nothing to update")
+			ui.Info("nothing to update")
 			return
 		}
 
@@ -46,7 +47,7 @@ func updateAll(m *manifest.Manifest) {
 	if err := installAll(m, lock); err != nil {
 		fatal(err)
 	}
-	fmt.Printf("updated %d addon(s)\n", len(lock.Packages))
+	ui.Success("updated %d addon(s)", len(lock.Packages))
 }
 
 func updateOne(m *manifest.Manifest, name string) {
@@ -81,7 +82,7 @@ func updateOne(m *manifest.Manifest, name string) {
 	if err := installOne(m, lookup.Name, lock.Packages[lookup.Name]); err != nil {
 		fatal(err)
 	}
-	fmt.Printf("updated %s@%s\n", lookup.Name, lookup.Version)
+	ui.Success("updated %s@%s", lookup.Name, lookup.Version)
 }
 
 func init() {

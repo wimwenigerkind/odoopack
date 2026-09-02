@@ -13,6 +13,7 @@ import (
 	"github.com/wimwenigerkind/odoopack/pkg/installer"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
+	"github.com/wimwenigerkind/odoopack/pkg/ui"
 )
 
 var removeCmd = &cobra.Command{
@@ -30,7 +31,7 @@ var removeCmd = &cobra.Command{
 		}
 
 		if len(m.Require) == 0 {
-			fmt.Println("no addons installed")
+			ui.Info("no addons required")
 			return
 		}
 
@@ -63,7 +64,7 @@ var removeCmd = &cobra.Command{
 			fatal(err)
 		}
 
-		fmt.Println("removed", addonName+"@"+version)
+		ui.Success("removed %s@%s", addonName, version)
 	},
 }
 
