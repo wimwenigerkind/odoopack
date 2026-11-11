@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 	odoosemver "github.com/wimwenigerkind/odoopack-semver"
+	"github.com/wimwenigerkind/odoopack/pkg/addonsdir"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
 	"github.com/wimwenigerkind/odoopack/pkg/ui"
@@ -45,8 +46,10 @@ var doctorCmd = &cobra.Command{
 			ok("odoo series: %s", m.Odoo)
 		}
 
-		if m.AddonsPath == "" {
-			warn("addons_path not set")
+		if wd, err := os.Getwd(); err != nil {
+			bad("addons_path: %v", err)
+		} else if err := addonsdir.Check(wd, m.AddonsPath); err != nil {
+			bad("%v", err)
 		} else {
 			ok("addons_path: %s", m.AddonsPath)
 		}

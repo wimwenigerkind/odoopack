@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"github.com/spf13/cobra"
+	"github.com/wimwenigerkind/odoopack/pkg/addonsdir"
 	"github.com/wimwenigerkind/odoopack/pkg/installer"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
@@ -25,6 +26,7 @@ var installCmd = &cobra.Command{
 		if err != nil {
 			fatal(err)
 		}
+		checkAddonsPath(m)
 
 		if len(m.Require) == 0 {
 			ui.Info("no addons required")
@@ -32,6 +34,7 @@ var installCmd = &cobra.Command{
 		}
 
 		lock := lockfile.LoadOrNew()
+		previous := lock
 
 		isStale, err := lockfile.IsStale(m.Require, m.Indexes, lock.Packages, lock.ContentHash)
 		if err != nil {
@@ -49,7 +52,7 @@ var installCmd = &cobra.Command{
 			}
 		}
 
-		if err := installAll(m, lock); err != nil {
+		if err := installAll(m, lock, previous); err != nil {
 			ui.Error("install failed: %v", err)
 			os.Exit(1)
 		}
@@ -57,8 +60,11 @@ var installCmd = &cobra.Command{
 	},
 }
 
-func installAll(m *manifest.Manifest, lock lockfile.LockFile) error {
-	if err := os.RemoveAll(m.AddonsPath); err != nil {
+// installAll replaces addons_path with the packages in lock. previous is the
+// lockfile before this run resolved again: an install from an older odoopack
+// without the marker holds the addons of that one, and must still be adopted.
+func installAll(m *manifest.Manifest, lock, previous lockfile.LockFile) error {
+	if err := addonsdir.Clear(m.AddonsPath, lockedDirs(lock.Packages, previous.Packages)); err != nil {
 		return err
 	}
 
@@ -80,6 +86,28 @@ func installAll(m *manifest.Manifest, lock lockfile.LockFile) error {
 		}
 		return nil
 	})
+}
+
+// checkAddonsPath runs before a command writes to addons_path, so that nothing
+// is created or deleted for an invalid one.
+func checkAddonsPath(m *manifest.Manifest) {
+	wd, err := os.Getwd()
+	if err != nil {
+		fatal(err)
+	}
+	if err := addonsdir.Check(wd, m.AddonsPath); err != nil {
+		fatal(err)
+	}
+}
+
+func lockedDirs(locks ...map[string]lockfile.LockedPackage) map[string]bool {
+	dirs := make(map[string]bool)
+	for _, packages := range locks {
+		for name := range packages {
+			dirs[installer.FormatAddonDir(name)] = true
+		}
+	}
+	return dirs
 }
 
 func installOne(m *manifest.Manifest, name string, pkg lockfile.LockedPackage) error {

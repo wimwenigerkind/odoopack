@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/wimwenigerkind/odoopack/pkg/addonsdir"
 	"github.com/wimwenigerkind/odoopack/pkg/index"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
@@ -23,6 +24,7 @@ var updateCmd = &cobra.Command{
 		if err != nil {
 			fatal(err)
 		}
+		checkAddonsPath(m)
 		if len(m.Require) == 0 {
 			ui.Info("nothing to update")
 			return
@@ -37,6 +39,7 @@ var updateCmd = &cobra.Command{
 }
 
 func updateAll(m *manifest.Manifest) {
+	previous := lockfile.LoadOrNew()
 	lock, err := lockfile.RecomputeHash(m.Require, m.Indexes, m.Odoo)
 	if err != nil {
 		fatal(err)
@@ -44,7 +47,7 @@ func updateAll(m *manifest.Manifest) {
 	if err := lockfile.Save(lock); err != nil {
 		fatal(err)
 	}
-	if err := installAll(m, lock); err != nil {
+	if err := installAll(m, lock, previous); err != nil {
 		fatal(err)
 	}
 	ui.Success("updated %d addon(s)", len(lock.Packages))
@@ -79,6 +82,9 @@ func updateOne(m *manifest.Manifest, name string) {
 		fatal(err)
 	}
 
+	if err := addonsdir.Claim(m.AddonsPath, lockedDirs(lock.Packages)); err != nil {
+		fatal(err)
+	}
 	if err := installOne(m, lookup.Name, lock.Packages[lookup.Name]); err != nil {
 		fatal(err)
 	}

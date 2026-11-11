@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/wimwenigerkind/odoopack/pkg/addonsdir"
 	"github.com/wimwenigerkind/odoopack/pkg/index"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
@@ -27,6 +28,7 @@ var requireCmd = &cobra.Command{
 		if err != nil {
 			fatal(err)
 		}
+		checkAddonsPath(m)
 
 		constraint := versionArg
 		if constraint == "" {
@@ -56,6 +58,9 @@ var requireCmd = &cobra.Command{
 			fatal(err)
 		}
 
+		if err := addonsdir.Claim(m.AddonsPath, lockedDirs(oldLock.Packages)); err != nil {
+			fatal(err)
+		}
 		added := 0
 		for name, pkg := range lockFile.Packages {
 			if _, existed := oldLock.Packages[name]; existed {

@@ -27,7 +27,7 @@ The manifest describes your project: which addons it requires and which registri
 | `name` | string | Project name. |
 | `require` | object | Map of addon name to pinned version. The version is an exact string, not a range. |
 | `indexes` | object | Map of index name to `{ url, type }`. Registries to resolve addons from. |
-| `addons_path` | string | Directory addons are installed into. Defaults to `addons/odoopack`. |
+| `addons_path` | string | Directory addons are installed into. Defaults to `addons/odoopack`. Must be a relative path that resolves, also through symlinks, to a directory strictly inside the project, not the project directory itself. odoopack owns this directory: it writes a `.odoopack` marker into it and refuses to clear a non-empty directory without the marker. See [install](../commands/install.md#the-odoopack-marker). |
 
 ### `indexes.<name>`
 
