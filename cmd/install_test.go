@@ -143,21 +143,13 @@ func TestInstallAllAdoptsLegacyInstallAfterResolvingAgain(t *testing.T) {
 	}
 }
 
-// install exits the process on an error, so the test runs it in a child
-// process of the test binary.
-func TestInstallRejectsInvalidLockfileName(t *testing.T) {
-	if os.Getenv("ODOOPACK_TEST_INSTALL") == "1" {
-		installCmd.Run(installCmd, nil)
-		return
-	}
-
-	dir := t.TempDir()
-	files := map[string]string{
-		"odoopack.json": `{"name":"test","odoo":"19.0","require":{"acme/health-check":"19.0"},"addons_path":"addons/odoopack"}`,
-		"odoopack.lock": `{"content_hash":"sha256:00","packages":{"../evil":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/x.git"}}}}`,
-		filepath.Join("addons", "odoopack", addonsdir.MarkerName):                   "",
-		filepath.Join("addons", "odoopack", "acme_health_check", "__manifest__.py"): "{}",
-	}
+// installInChild runs install in a child process of the test binary, since
+// install exits the process on an error. The calling test must start with
+// runInstallIfChild. It writes files into a temporary project directory and
+// fails the test if install succeeds or changes any of them.
+func installInChild(t *testing.T, files map[string]string) (dir, out string) {
+	t.Helper()
+	dir = t.TempDir()
 	for name, content := range files {
 		path := filepath.Join(dir, name)
 		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
@@ -168,15 +160,12 @@ func TestInstallRejectsInvalidLockfileName(t *testing.T) {
 		}
 	}
 
-	cmd := exec.Command(os.Args[0], "-test.run=^TestInstallRejectsInvalidLockfileName$")
+	cmd := exec.Command(os.Args[0], "-test.run=^"+t.Name()+"$")
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "ODOOPACK_TEST_INSTALL=1")
-	out, err := cmd.CombinedOutput()
+	output, err := cmd.CombinedOutput()
 	if err == nil {
-		t.Fatalf("install succeeded:\n%s", out)
-	}
-	if !strings.Contains(string(out), "odoopack.lock") || !strings.Contains(string(out), "../evil") {
-		t.Fatalf("output does not name the lockfile and the invalid name:\n%s", out)
+		t.Fatalf("install succeeded:\n%s", output)
 	}
 
 	for name, content := range files {
@@ -185,7 +174,50 @@ func TestInstallRejectsInvalidLockfileName(t *testing.T) {
 			t.Errorf("%s changed: %q, %v", name, got, err)
 		}
 	}
+	return dir, string(output)
+}
+
+func runInstallIfChild() bool {
+	if os.Getenv("ODOOPACK_TEST_INSTALL") != "1" {
+		return false
+	}
+	installCmd.Run(installCmd, nil)
+	return true
+}
+
+func TestInstallRejectsInvalidLockfileName(t *testing.T) {
+	if runInstallIfChild() {
+		return
+	}
+
+	dir, out := installInChild(t, map[string]string{
+		"odoopack.json": `{"name":"test","odoo":"19.0","require":{"acme/health-check":"19.0"},"addons_path":"addons/odoopack"}`,
+		"odoopack.lock": `{"content_hash":"sha256:00","packages":{"../evil":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/x.git"}}}}`,
+		filepath.Join("addons", "odoopack", addonsdir.MarkerName):                   "",
+		filepath.Join("addons", "odoopack", "acme_health_check", "__manifest__.py"): "{}",
+	})
+	if !strings.Contains(out, "odoopack.lock") || !strings.Contains(out, "../evil") {
+		t.Fatalf("output does not name the lockfile and the invalid name:\n%s", out)
+	}
 	if _, err := os.Stat(filepath.Join(dir, "evil")); !os.IsNotExist(err) {
 		t.Errorf("evil exists: %v", err)
+	}
+}
+
+func TestInstallRejectsNewerLockfileFormat(t *testing.T) {
+	if runInstallIfChild() {
+		return
+	}
+
+	// The content hash is stale on purpose: install must stop before it would
+	// resolve again and overwrite the lockfile.
+	_, out := installInChild(t, map[string]string{
+		"odoopack.json": `{"name":"test","odoo":"19.0","require":{"acme/health-check":"19.0"},"addons_path":"addons/odoopack"}`,
+		"odoopack.lock": `{"format":2,"content_hash":"sha256:00","packages":{"acme/health-check":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/x.git"}}}}`,
+		filepath.Join("addons", "odoopack", addonsdir.MarkerName):                   "",
+		filepath.Join("addons", "odoopack", "acme_health_check", "__manifest__.py"): "{}",
+	})
+	if !strings.Contains(out, "odoopack.lock") || !strings.Contains(out, "upgrade odoopack") {
+		t.Fatalf("output does not name the lockfile and ask to upgrade:\n%s", out)
 	}
 }

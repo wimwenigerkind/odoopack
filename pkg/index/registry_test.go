@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/wimwenigerkind/odoopack-spec/registryapi"
+	"github.com/wimwenigerkind/odoopack/pkg/buildinfo"
 )
 
 const testShasum = "sha256:ece96e65881389c3ef6538ea26b9d7149e8e0af042c828d17283c6b76c633543"
@@ -138,5 +139,26 @@ func TestRegistryLookupReportsProblemDetail(t *testing.T) {
 	_, err := (&RegistryProvider{BaseURL: srv.URL}).Lookup("acme/health-check", "19.0", "19.0")
 	if err == nil || !strings.Contains(err.Error(), "database unavailable") {
 		t.Fatalf("got error %v, want the problem detail", err)
+	}
+}
+
+func TestRegistryLookupSendsUserAgent(t *testing.T) {
+	version := buildinfo.Version
+	buildinfo.Version = "1.2.3"
+	t.Cleanup(func() { buildinfo.Version = version })
+
+	var userAgent atomic.Value
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userAgent.Store(r.UserAgent())
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(registryapi.Addon{Name: "acme/health-check", Versions: []registryapi.Version{validVersion("19.0.1.0.0")}})
+	}))
+	t.Cleanup(srv.Close)
+
+	if _, err := (&RegistryProvider{BaseURL: srv.URL}).Lookup("acme/health-check", "19.0", "19.0"); err != nil {
+		t.Fatal(err)
+	}
+	if got := userAgent.Load(); got != "odoopack/1.2.3" {
+		t.Fatalf("got User-Agent %v, want odoopack/1.2.3", got)
 	}
 }

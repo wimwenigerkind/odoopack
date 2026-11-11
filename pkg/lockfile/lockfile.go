@@ -21,7 +21,7 @@ func LoadOrNew() (LockFile, error) {
 		return LockFile{}, err
 	}
 	if !exists {
-		return LockFile{Packages: make(map[string]LockedPackage)}, nil
+		return LockFile{Format: Format, Packages: make(map[string]LockedPackage)}, nil
 	}
 	lf, err := Load()
 	if err != nil {
@@ -51,6 +51,15 @@ func Load() (LockFile, error) {
 	if err := json.Unmarshal(data, &lockFile); err != nil {
 		return LockFile{}, err
 	}
+	switch {
+	// Every lockfile written before the field existed is format 1.
+	case lockFile.Format == 0:
+		lockFile.Format = 1
+	case lockFile.Format < 0:
+		return LockFile{}, fmt.Errorf("%s: invalid format %d", viper.GetString("lock"), lockFile.Format)
+	case lockFile.Format > Format:
+		return LockFile{}, fmt.Errorf("%s has format %d, but this odoopack only reads up to format %d; upgrade odoopack", viper.GetString("lock"), lockFile.Format, Format)
+	}
 	for pkg := range lockFile.Packages {
 		if err := name.ValidPackage(pkg); err != nil {
 			return LockFile{}, fmt.Errorf("%s: %w", viper.GetString("lock"), err)
@@ -61,6 +70,7 @@ func Load() (LockFile, error) {
 }
 
 func Save(lockFile LockFile) error {
+	lockFile.Format = Format
 	data, err := json.MarshalIndent(lockFile, "", "  ")
 	if err != nil {
 		return err

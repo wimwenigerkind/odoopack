@@ -13,6 +13,7 @@ import (
 
 	"github.com/wimwenigerkind/odoopack-spec/digest"
 	"github.com/wimwenigerkind/odoopack/pkg/auth"
+	"github.com/wimwenigerkind/odoopack/pkg/buildinfo"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 	"github.com/wimwenigerkind/odoopack/pkg/store"
 )
@@ -115,6 +116,7 @@ func downloadToTmp(url string) (*os.File, error) {
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Set("User-Agent", buildinfo.UserAgent())
 	if token := auth.TokenForURL(url); token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}

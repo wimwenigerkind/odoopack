@@ -11,6 +11,7 @@ import (
 
 	"github.com/wimwenigerkind/odoopack-spec/name"
 	"github.com/wimwenigerkind/odoopack-spec/registryapi"
+	"github.com/wimwenigerkind/odoopack/pkg/buildinfo"
 	"github.com/wimwenigerkind/odoopack/pkg/ui"
 )
 
@@ -39,6 +40,7 @@ func (p *RegistryProvider) Lookup(addonName, constraint, odooSeries string) (Add
 	if err != nil {
 		return AddonVersion{}, err
 	}
+	req.Header.Set("User-Agent", buildinfo.UserAgent())
 	if p.Token != "" {
 		req.Header.Set("Authorization", "Bearer "+p.Token)
 	}

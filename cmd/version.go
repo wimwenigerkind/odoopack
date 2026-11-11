@@ -8,40 +8,35 @@ import (
 	"runtime"
 
 	"github.com/spf13/cobra"
-)
-
-var (
-	buildVersion = "dev"
-	buildCommit  = "none"
-	buildDate    = "unknown"
+	"github.com/wimwenigerkind/odoopack/pkg/buildinfo"
 )
 
 func SetBuildInfo(version, commit, date string) {
 	if version != "" {
-		buildVersion = version
+		buildinfo.Version = version
 	}
 	if commit != "" {
-		buildCommit = commit
+		buildinfo.Commit = commit
 	}
 	if date != "" {
-		buildDate = date
+		buildinfo.Date = date
 	}
-	rootCmd.Version = buildVersion
+	rootCmd.Version = buildinfo.Version
 }
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print version information",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("odoopack %s\n", buildVersion)
-		fmt.Printf("  commit: %s\n", buildCommit)
-		fmt.Printf("  built:  %s\n", buildDate)
+		fmt.Printf("odoopack %s\n", buildinfo.Version)
+		fmt.Printf("  commit: %s\n", buildinfo.Commit)
+		fmt.Printf("  built:  %s\n", buildinfo.Date)
 		fmt.Printf("  go:     %s %s/%s\n", runtime.Version(), runtime.GOOS, runtime.GOARCH)
 	},
 }
 
 func init() {
-	rootCmd.Version = buildVersion
+	rootCmd.Version = buildinfo.Version
 	rootCmd.SetVersionTemplate("odoopack {{.Version}}\n")
 	rootCmd.AddCommand(versionCmd)
 }

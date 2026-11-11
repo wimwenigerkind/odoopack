@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/wimwenigerkind/odoopack/pkg/buildinfo"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 	"github.com/wimwenigerkind/odoopack/pkg/store"
 )
@@ -262,5 +263,27 @@ func TestUnzipNestedAddon(t *testing.T) {
 		if info.Mode().Perm() != want {
 			t.Errorf("%s has mode %v, want %v", rel, info.Mode().Perm(), want)
 		}
+	}
+}
+
+func TestDownloadSendsUserAgent(t *testing.T) {
+	version := buildinfo.Version
+	buildinfo.Version = "1.2.3"
+	t.Cleanup(func() { buildinfo.Version = version })
+
+	var userAgent atomic.Value
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userAgent.Store(r.UserAgent())
+	}))
+	t.Cleanup(srv.Close)
+
+	tmp, err := downloadToTmp(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = tmp.Close()
+	_ = os.Remove(tmp.Name())
+	if got := userAgent.Load(); got != "odoopack/1.2.3" {
+		t.Fatalf("got User-Agent %v, want odoopack/1.2.3", got)
 	}
 }

@@ -1,6 +1,6 @@
 # Private registries
 
-Registries that serve private addons require a bearer token. odoopack sends this token both when looking up an addon and when downloading its zip distribution.
+Registries that serve private addons require a bearer token. odoopack sends this token both when looking up an addon and when downloading its zip distribution. Every request also carries `User-Agent: odoopack/<version>`, so a registry can tell which odoopack release is asking.
 
 ## Providing a token
 
