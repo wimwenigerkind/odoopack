@@ -15,6 +15,8 @@ By default the CLI looks for `$HOME/.odoopack.yaml`. Override the path with the 
 | `manifest` | `odoopack.json` | Manifest filename. |
 | `lock` | `odoopack.lock` | Lockfile filename. |
 | `auth` | (unset) | Registry tokens. Set through the `ODOOPACK_AUTH` environment variable. |
+| `cache_dir` | `$XDG_CACHE_HOME/odoopack`, else `~/.cache/odoopack` | Directory of the shared [package store](../commands/cache.md). |
+| `no_cache` | `false` | Install without the package store. Also the `--no-cache` flag. |
 
 ## Environment variables
 
@@ -23,6 +25,8 @@ Every key can be set through the environment by upper-casing its name:
 | Variable | Key |
 | --- | --- |
 | `ODOOPACK_AUTH` | `auth` |
+| `ODOOPACK_CACHE_DIR` | `cache_dir` |
+| `ODOOPACK_NO_CACHE` | `no_cache` |
 | `DEFAULT_INDEX_URL` | `default_index_url` |
 | `ADDONS_PATH` | `addons_path` |
 | `MANIFEST` | `manifest` |

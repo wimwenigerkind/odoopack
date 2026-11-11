@@ -6,6 +6,7 @@ A package manager for Odoo addons. odoopack resolves addon dependencies from one
 
 - Declarative project manifest (`odoopack.json`) listing required addons and registries.
 - Reproducible installs via a lockfile (`odoopack.lock`) with checksum verification.
+- A shared package store: each addon version is downloaded and stored once, and projects hard link to it.
 - Multiple registries per project, plus a built-in default.
 - Private registries via bearer-token authentication.
 - First-class CI support through the [setup-odoopack](https://github.com/wimwenigerkind/setup-odoopack) GitHub Action.

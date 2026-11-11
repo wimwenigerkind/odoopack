@@ -34,6 +34,24 @@ jobs:
       - run: odoopack install
 ```
 
+## Caching packages
+
+`odoopack install` keeps every downloaded addon in the [package store](../commands/cache.md). Cache the store between runs, keyed by the lockfile, so that a run only downloads the addons that changed:
+
+```yaml
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/odoopack
+          key: odoopack-${{ runner.os }}-${{ hashFiles('odoopack.lock') }}
+          restore-keys: odoopack-${{ runner.os }}-
+      - run: odoopack install
+      - run: odoopack cache prune
+```
+
+`cache prune` after the install drops the addons the current lockfile no longer uses, so the saved cache does not keep growing with every version that was ever installed.
+
+Installed addon files are read-only, because they are hard linked to the store. If a later step patches them, install with `--no-cache` instead.
+
 ## Inputs
 
 | Input | Default | Description |

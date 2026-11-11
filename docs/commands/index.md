@@ -11,6 +11,7 @@ Every command operates on the manifest (`odoopack.json`) and lockfile (`odoopack
 | [`remove`](remove.md) | | Remove an addon from requirements. |
 | [`list`](list.md) | `l` | List required addons and their install status. |
 | [`index`](index-command.md) | `idx` | Manage registry indexes. |
+| [`cache`](cache.md) | | Manage the shared package store. |
 
 ## Global flags
 

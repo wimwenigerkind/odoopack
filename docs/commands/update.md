@@ -19,6 +19,12 @@ odoopack update [addon]
 
 - `[addon]`: optional. When given, only that addon is re-resolved and reinstalled. It must already be present in `odoopack.json`.
 
+## Flags
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--no-cache` | `false` | Install without the shared [package store](cache.md). Same as `ODOOPACK_NO_CACHE=1`. |
+
 ## Behavior
 
 - **Without an argument:** recomputes the whole lockfile from the current requirements and indexes, saves it, and reinstalls all addons.
