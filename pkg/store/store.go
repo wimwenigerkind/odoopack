@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
+	"time"
 
 	"github.com/spf13/viper"
 )
@@ -24,17 +26,22 @@ func New(dir string) *Store {
 	return &Store{dir: dir}
 }
 
-// Default returns the store under the configured cache directory, or nil when
-// caching is turned off.
-func Default() (*Store, error) {
-	if viper.GetBool("no_cache") {
-		return nil, nil
-	}
+// Open returns the store under the configured cache directory.
+func Open() (*Store, error) {
 	dir, err := CacheDir()
 	if err != nil {
 		return nil, err
 	}
 	return New(filepath.Join(dir, "store")), nil
+}
+
+// Default returns the store installs go through, or nil when caching is turned
+// off.
+func Default() (*Store, error) {
+	if viper.GetBool("no_cache") {
+		return nil, nil
+	}
+	return Open()
 }
 
 // CacheDir follows XDG rather than os.UserCacheDir, which would put the cache
@@ -94,6 +101,86 @@ func (s *Store) Ensure(digest string, fill func(dst string) error) (string, erro
 		}
 	}
 	return entry, nil
+}
+
+type PruneResult struct {
+	Entries int
+	Bytes   int64
+}
+
+// A staging directory younger than this may belong to an install that is
+// still running.
+const staleStagingAge = time.Hour
+
+// Prune removes every entry no project links to any more, or every entry at
+// all. An entry is in use while one of its files has a second hard link, so
+// the store needs no record of the projects that use it.
+func (s *Store) Prune(all bool) (PruneResult, error) {
+	var res PruneResult
+	entries, err := os.ReadDir(s.dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return res, nil
+	}
+	if err != nil {
+		return res, err
+	}
+
+	for _, e := range entries {
+		path := filepath.Join(s.dir, e.Name())
+		staging := strings.HasPrefix(e.Name(), ".tmp-")
+		// Leave alone whatever the store did not create.
+		if !staging && !digestPattern.MatchString(e.Name()) {
+			continue
+		}
+
+		if staging && !all {
+			info, err := e.Info()
+			if err != nil {
+				return res, err
+			}
+			if time.Since(info.ModTime()) < staleStagingAge {
+				continue
+			}
+		}
+
+		size, used, err := usage(path)
+		if err != nil {
+			return res, err
+		}
+		if used && !all {
+			continue
+		}
+		if err := os.RemoveAll(path); err != nil {
+			return res, err
+		}
+		res.Bytes += size
+		if !staging {
+			res.Entries++
+		}
+	}
+	return res, nil
+}
+
+func usage(root string) (size int64, used bool, err error) {
+	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || !d.Type().IsRegular() {
+			return err
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		size += info.Size()
+		links, err := linkCount(path, info)
+		if err != nil {
+			return err
+		}
+		if links > 1 {
+			used = true
+		}
+		return nil
+	})
+	return size, used, err
 }
 
 // Files are hard linked into projects, so an edit in a project would change

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 const digest = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
@@ -140,5 +141,98 @@ func TestCopyFileIsWritable(t *testing.T) {
 	}
 	if info.Mode().Perm()&0200 == 0 {
 		t.Fatalf("copied file mode %v is not writable", info.Mode().Perm())
+	}
+}
+
+func TestPruneKeepsLinkedEntries(t *testing.T) {
+	dir := t.TempDir()
+	st := New(dir)
+	used, err := st.Ensure(digest, fillAddon)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unused, err := st.Ensure(strings.Repeat("f", 64), fillAddon)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Link(used, filepath.Join(t.TempDir(), "addon")); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := st.Prune(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Entries != 1 || res.Bytes == 0 {
+		t.Fatalf("got %+v, want one entry with its bytes", res)
+	}
+	if _, err := os.Stat(used); err != nil {
+		t.Errorf("linked entry removed: %v", err)
+	}
+	if _, err := os.Stat(unused); !os.IsNotExist(err) {
+		t.Errorf("unlinked entry kept: %v", err)
+	}
+}
+
+func TestPruneAllRemovesLinkedEntries(t *testing.T) {
+	st := New(t.TempDir())
+	entry, err := st.Ensure(digest, fillAddon)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project := filepath.Join(t.TempDir(), "addon")
+	if err := Link(entry, project); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := st.Prune(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Entries != 1 {
+		t.Fatalf("got %+v, want one entry", res)
+	}
+	if _, err := os.Stat(filepath.Join(project, "__manifest__.py")); err != nil {
+		t.Errorf("project lost its files: %v", err)
+	}
+}
+
+func TestPruneStagingAndForeignEntries(t *testing.T) {
+	dir := t.TempDir()
+	st := New(dir)
+	fresh := filepath.Join(dir, ".tmp-fresh")
+	stale := filepath.Join(dir, ".tmp-stale")
+	foreign := filepath.Join(dir, "notes")
+	for _, p := range []string{fresh, stale, foreign} {
+		if err := os.Mkdir(p, 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	old := time.Now().Add(-2 * staleStagingAge)
+	if err := os.Chtimes(stale, old, old); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := st.Prune(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Entries != 0 {
+		t.Fatalf("staging directories counted as entries: %+v", res)
+	}
+	if _, err := os.Stat(stale); !os.IsNotExist(err) {
+		t.Errorf("stale staging directory kept: %v", err)
+	}
+	for _, p := range []string{fresh, foreign} {
+		if _, err := os.Stat(p); err != nil {
+			t.Errorf("%s removed: %v", filepath.Base(p), err)
+		}
+	}
+}
+
+func TestPruneMissingStore(t *testing.T) {
+	res, err := New(filepath.Join(t.TempDir(), "missing")).Prune(false)
+	if err != nil || res != (PruneResult{}) {
+		t.Fatalf("got %+v, %v", res, err)
 	}
 }
