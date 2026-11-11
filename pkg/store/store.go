@@ -213,21 +213,13 @@ func Link(src, dst string) error {
 		}
 		target := filepath.Join(dst, rel)
 
-		switch {
-		case d.IsDir():
+		if d.IsDir() {
 			return os.MkdirAll(target, 0755)
-		case d.Type()&fs.ModeSymlink != 0:
-			link, err := os.Readlink(path)
-			if err != nil {
-				return err
-			}
-			return os.Symlink(link, target)
-		default:
-			if err := os.Link(path, target); err == nil {
-				return nil
-			}
-			return copyFile(path, target)
 		}
+		if err := os.Link(path, target); err == nil {
+			return nil
+		}
+		return copyFile(path, target)
 	})
 }
 

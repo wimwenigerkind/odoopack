@@ -17,10 +17,7 @@ func fillAddon(dst string) error {
 	if err := os.WriteFile(filepath.Join(dst, "__manifest__.py"), []byte("{}"), 0644); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(dst, "models", "a.py"), []byte("a"), 0644); err != nil {
-		return err
-	}
-	return os.Symlink("models/a.py", filepath.Join(dst, "link.py"))
+	return os.WriteFile(filepath.Join(dst, "models", "a.py"), []byte("a"), 0644)
 }
 
 func TestEnsureFillsOnce(t *testing.T) {
@@ -107,14 +104,6 @@ func TestLinkSharesFiles(t *testing.T) {
 		if !os.SameFile(src, dst) {
 			t.Errorf("%s is not hard linked to the store", rel)
 		}
-	}
-
-	link, err := os.Readlink(filepath.Join(dest, "link.py"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if link != "models/a.py" {
-		t.Errorf("symlink points to %q", link)
 	}
 
 	if err := os.RemoveAll(dest); err != nil {

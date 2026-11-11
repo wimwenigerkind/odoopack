@@ -1,13 +1,15 @@
 package installer
 
 import (
+	"archive/zip"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
-	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -75,7 +77,7 @@ func extractZip(pkg lockfile.LockedPackage, dest string) error {
 	}
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	if err := unzip(tmpPath, tmpDir); err != nil {
+	if err := unzip(tmpPath, tmpDir, maxZipBytes, maxZipEntries); err != nil {
 		return err
 	}
 
@@ -146,10 +148,115 @@ func verifyShasum(path, expected string) error {
 	return nil
 }
 
-func unzip(zipPath, destDir string) error {
-	out, err := exec.Command("unzip", "-o", zipPath, "-d", destDir).CombinedOutput()
+// Limits on what a zipball may unpack to, so a zip bomb cannot fill the disk.
+// They sit far above the largest Odoo addons.
+const (
+	maxZipBytes   = 1 << 30
+	maxZipEntries = 50000
+)
+
+// unzip extracts zipPath into destDir. It refuses symlinks and any entry that
+// would land outside a single root directory, so that neither the store nor a
+// project can end up with a path that points elsewhere.
+func unzip(zipPath, destDir string, maxBytes int64, maxEntries int) error {
+	r, err := zip.OpenReader(zipPath)
 	if err != nil {
-		return fmt.Errorf("unzip failed: %s: %w", out, err)
+		return fmt.Errorf("open zip: %w", err)
+	}
+	defer func() { _ = r.Close() }()
+
+	if len(r.File) > maxEntries {
+		return fmt.Errorf("zip has %d entries, more than the limit of %d", len(r.File), maxEntries)
+	}
+
+	var root string
+	var written int64
+	for _, f := range r.File {
+		name, err := entryPath(f.Name)
+		if err != nil {
+			return err
+		}
+		top, _, nested := strings.Cut(name, "/")
+		if !nested && !f.Mode().IsDir() {
+			return fmt.Errorf("zip entry %q is outside the root directory", f.Name)
+		}
+		if root == "" {
+			root = top
+		} else if top != root {
+			return fmt.Errorf("zip has more than one root directory: %q and %q", root, top)
+		}
+
+		target := filepath.Join(destDir, filepath.FromSlash(name))
+		mode := f.Mode()
+		switch {
+		case mode&fs.ModeSymlink != 0:
+			return fmt.Errorf("zip entry %q is a symlink", f.Name)
+		case mode.IsDir():
+			if err := os.MkdirAll(target, 0755); err != nil {
+				return err
+			}
+		case mode.IsRegular():
+			n, err := extractFile(f, target, maxBytes-written)
+			if err != nil {
+				return err
+			}
+			written += n
+			if written > maxBytes {
+				return fmt.Errorf("zip unpacks to more than the limit of %d bytes", maxBytes)
+			}
+		default:
+			return fmt.Errorf("zip entry %q has unsupported type %v", f.Name, mode.Type())
+		}
 	}
 	return nil
+}
+
+// entryPath returns the cleaned slash separated path of a zip entry name.
+func entryPath(name string) (string, error) {
+	if strings.Contains(name, "\\") {
+		return "", fmt.Errorf("zip entry %q contains a backslash", name)
+	}
+	if path.IsAbs(name) || (len(name) >= 2 && name[1] == ':') {
+		return "", fmt.Errorf("zip entry %q has an absolute path", name)
+	}
+	for _, part := range strings.Split(name, "/") {
+		if part == ".." {
+			return "", fmt.Errorf("zip entry %q contains a .. component", name)
+		}
+	}
+	// IsLocal also catches what is only special on Windows, such as NUL.
+	clean := path.Clean(name)
+	if !filepath.IsLocal(filepath.FromSlash(clean)) || clean == "." {
+		return "", fmt.Errorf("zip entry %q has an invalid path", name)
+	}
+	return clean, nil
+}
+
+// extractFile writes at most limit+1 bytes of f to target and returns how many
+// it wrote. It counts what it actually decompresses, since the sizes in the
+// zip header are only claims.
+func extractFile(f *zip.File, target string, limit int64) (int64, error) {
+	if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+		return 0, err
+	}
+	rc, err := f.Open()
+	if err != nil {
+		return 0, fmt.Errorf("zip entry %q: %w", f.Name, err)
+	}
+	defer func() { _ = rc.Close() }()
+
+	perm := os.FileMode(0644)
+	if f.Mode()&0111 != 0 {
+		perm = 0755
+	}
+	out, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_EXCL, perm)
+	if err != nil {
+		return 0, err
+	}
+	n, err := io.Copy(out, io.LimitReader(rc, limit+1))
+	if err != nil {
+		_ = out.Close()
+		return n, fmt.Errorf("zip entry %q: %w", f.Name, err)
+	}
+	return n, out.Close()
 }
