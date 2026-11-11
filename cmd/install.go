@@ -91,5 +91,6 @@ func installOne(m *manifest.Manifest, name string, pkg lockfile.LockedPackage) e
 }
 
 func init() {
+	addNoCacheFlag(installCmd)
 	rootCmd.AddCommand(installCmd)
 }

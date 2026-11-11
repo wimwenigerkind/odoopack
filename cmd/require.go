@@ -72,5 +72,6 @@ var requireCmd = &cobra.Command{
 }
 
 func init() {
+	addNoCacheFlag(requireCmd)
 	rootCmd.AddCommand(requireCmd)
 }

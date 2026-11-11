@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
+	"github.com/wimwenigerkind/odoopack/pkg/store"
 )
 
 type Installer interface {
@@ -16,7 +17,11 @@ func New(sourceType string) (Installer, error) {
 	case "git":
 		return NewGitInstaller(), nil
 	case "zip":
-		return NewZipInstaller(), nil
+		st, err := store.Default()
+		if err != nil {
+			return nil, err
+		}
+		return NewZipInstaller(st), nil
 	default:
 		return nil, fmt.Errorf("installer type %q is not supported", sourceType)
 	}

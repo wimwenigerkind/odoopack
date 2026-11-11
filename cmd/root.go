@@ -54,6 +54,8 @@ func init() {
 	viper.SetDefault("lock", "odoopack.lock")
 
 	_ = viper.BindEnv("auth", "ODOOPACK_AUTH")
+	_ = viper.BindEnv("cache_dir", "ODOOPACK_CACHE_DIR")
+	_ = viper.BindEnv("no_cache", "ODOOPACK_NO_CACHE")
 }
 
 func initConfig() {
@@ -72,6 +74,15 @@ func initConfig() {
 
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+	}
+}
+
+// addNoCacheFlag binds the flag only while cmd runs: binding the one viper key
+// to the flags of several commands up front would leave just the last binding.
+func addNoCacheFlag(cmd *cobra.Command) {
+	cmd.Flags().Bool("no-cache", false, "install without the shared package store")
+	cmd.PreRun = func(cmd *cobra.Command, args []string) {
+		_ = viper.BindPFlag("no_cache", cmd.Flags().Lookup("no-cache"))
 	}
 }
 

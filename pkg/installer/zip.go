@@ -13,19 +13,50 @@ import (
 
 	"github.com/wimwenigerkind/odoopack/pkg/auth"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
+	"github.com/wimwenigerkind/odoopack/pkg/store"
 )
 
-type ZipInstaller struct{}
+type ZipInstaller struct {
+	store *store.Store
+}
 
-func NewZipInstaller() *ZipInstaller {
-	return &ZipInstaller{}
+// NewZipInstaller installs through st, or straight into the project when st is
+// nil.
+func NewZipInstaller(st *store.Store) *ZipInstaller {
+	return &ZipInstaller{store: st}
 }
 
 func (i *ZipInstaller) Install(targetDir string, addonName string, pkg lockfile.LockedPackage) error {
 	if err := os.MkdirAll(targetDir, 0755); err != nil {
 		return err
 	}
+	dest := filepath.Join(targetDir, FormatAddonDir(addonName))
 
+	// Without a shasum there is nothing to look the package up by before
+	// downloading it, so it bypasses the store.
+	algo, digest, _ := strings.Cut(pkg.Dist.Shasum, ":")
+	if i.store == nil || algo != "sha256" {
+		if err := os.RemoveAll(dest); err != nil {
+			return err
+		}
+		return extractZip(pkg, dest)
+	}
+
+	entry, err := i.store.Ensure(strings.ToLower(digest), func(dst string) error {
+		return extractZip(pkg, dst)
+	})
+	if err != nil {
+		return err
+	}
+	if err := os.RemoveAll(dest); err != nil {
+		return err
+	}
+	return store.Link(entry, dest)
+}
+
+// extractZip downloads the package and moves its single root directory to
+// dest, which must not exist yet.
+func extractZip(pkg lockfile.LockedPackage, dest string) error {
 	tmp, err := downloadToTmp(pkg.Dist.URL)
 	if err != nil {
 		return err
@@ -38,7 +69,7 @@ func (i *ZipInstaller) Install(targetDir string, addonName string, pkg lockfile.
 		return err
 	}
 
-	tmpDir, err := os.MkdirTemp(targetDir, ".odoopack-unzip-*")
+	tmpDir, err := os.MkdirTemp(filepath.Dir(dest), ".odoopack-unzip-*")
 	if err != nil {
 		return err
 	}
@@ -56,10 +87,6 @@ func (i *ZipInstaller) Install(targetDir string, addonName string, pkg lockfile.
 		return fmt.Errorf("expected zip to contain a single root directory")
 	}
 
-	dest := filepath.Join(targetDir, FormatAddonDir(addonName))
-	if err := os.RemoveAll(dest); err != nil {
-		return err
-	}
 	return os.Rename(filepath.Join(tmpDir, entries[0].Name()), dest)
 }
 

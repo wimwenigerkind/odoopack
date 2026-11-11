@@ -86,5 +86,6 @@ func updateOne(m *manifest.Manifest, name string) {
 }
 
 func init() {
+	addNoCacheFlag(updateCmd)
 	rootCmd.AddCommand(updateCmd)
 }
