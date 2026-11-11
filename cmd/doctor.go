@@ -8,7 +8,7 @@ import (
 	"regexp"
 
 	"github.com/spf13/cobra"
-	odoosemver "github.com/wimwenigerkind/odoopack-semver"
+	"github.com/wimwenigerkind/odoopack-spec/version"
 	"github.com/wimwenigerkind/odoopack/pkg/addonsdir"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
@@ -73,11 +73,11 @@ var doctorCmd = &cobra.Command{
 				bad("require %s has an empty constraint", name)
 				continue
 			}
-			if _, err := odoosemver.ParseConstraint(constraint); err != nil {
+			if _, err := version.ParseConstraint(constraint); err != nil {
 				bad("require %s: invalid constraint %q (%v)", name, constraint, err)
 				continue
 			}
-			if v, err := odoosemver.Parse(constraint); err == nil && v.IsRelease() && m.Odoo != "" && v.SeriesString() != m.Odoo {
+			if v, err := version.Parse(constraint); err == nil && v.IsRelease() && m.Odoo != "" && v.SeriesString() != m.Odoo {
 				warn("require %s pins %s which targets Odoo %s, but the project is %s", name, constraint, v.SeriesString(), m.Odoo)
 			}
 		}

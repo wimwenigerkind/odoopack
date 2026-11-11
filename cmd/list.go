@@ -9,7 +9,7 @@ import (
 	"sort"
 
 	"github.com/spf13/cobra"
-	"github.com/wimwenigerkind/odoopack/pkg/installer"
+	"github.com/wimwenigerkind/odoopack-spec/name"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
 	"github.com/wimwenigerkind/odoopack/pkg/ui"
 )
@@ -44,8 +44,8 @@ var listCmd = &cobra.Command{
 	},
 }
 
-func installedStatus(addonsPath, name string) string {
-	info, err := os.Stat(filepath.Join(addonsPath, installer.FormatAddonDir(name)))
+func installedStatus(addonsPath, addon string) string {
+	info, err := os.Stat(filepath.Join(addonsPath, name.ModuleName(addon)))
 	if err == nil && info.IsDir() {
 		return "yes"
 	}

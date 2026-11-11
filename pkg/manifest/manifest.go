@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/spf13/viper"
+	"github.com/wimwenigerkind/odoopack-spec/name"
 	"github.com/wimwenigerkind/odoopack/pkg/helper"
 )
 
@@ -26,6 +27,11 @@ func Load() (*Manifest, error) {
 	var manifest Manifest
 	if err := json.Unmarshal(data, &manifest); err != nil {
 		return nil, err
+	}
+	for pkg := range manifest.Require {
+		if err := name.ValidPackage(pkg); err != nil {
+			return nil, fmt.Errorf("%s: %w", viper.GetString("manifest"), err)
+		}
 	}
 
 	return &manifest, nil

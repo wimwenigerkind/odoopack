@@ -2,8 +2,6 @@ package installer
 
 import (
 	"archive/zip"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"io/fs"
@@ -13,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/wimwenigerkind/odoopack-spec/digest"
 	"github.com/wimwenigerkind/odoopack/pkg/auth"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 	"github.com/wimwenigerkind/odoopack/pkg/store"
@@ -29,23 +28,31 @@ func NewZipInstaller(st *store.Store) *ZipInstaller {
 }
 
 func (i *ZipInstaller) Install(targetDir string, addonName string, pkg lockfile.LockedPackage) error {
+	dest, err := addonDir(targetDir, addonName)
+	if err != nil {
+		return err
+	}
+	var want digest.Digest
+	if pkg.Dist.Shasum != "" {
+		if want, err = digest.Parse(pkg.Dist.Shasum); err != nil {
+			return err
+		}
+	}
 	if err := os.MkdirAll(targetDir, 0755); err != nil {
 		return err
 	}
-	dest := filepath.Join(targetDir, FormatAddonDir(addonName))
 
 	// Without a shasum there is nothing to look the package up by before
 	// downloading it, so it bypasses the store.
-	algo, digest, _ := strings.Cut(pkg.Dist.Shasum, ":")
-	if i.store == nil || algo != "sha256" {
+	if i.store == nil || pkg.Dist.Shasum == "" {
 		if err := os.RemoveAll(dest); err != nil {
 			return err
 		}
-		return extractZip(pkg, dest)
+		return extractZip(pkg.Dist.URL, want, dest)
 	}
 
-	entry, err := i.store.Ensure(strings.ToLower(digest), func(dst string) error {
-		return extractZip(pkg, dst)
+	entry, err := i.store.Ensure(want.Hex(), func(dst string) error {
+		return extractZip(pkg.Dist.URL, want, dst)
 	})
 	if err != nil {
 		return err
@@ -56,19 +63,25 @@ func (i *ZipInstaller) Install(targetDir string, addonName string, pkg lockfile.
 	return store.Link(entry, dest)
 }
 
-// extractZip downloads the package and moves its single root directory to
-// dest, which must not exist yet.
-func extractZip(pkg lockfile.LockedPackage, dest string) error {
-	tmp, err := downloadToTmp(pkg.Dist.URL)
+// extractZip downloads the zipball at url, verifies it against want unless
+// want is empty, and moves its single root directory to dest, which must not
+// exist yet.
+func extractZip(url string, want digest.Digest, dest string) error {
+	tmp, err := downloadToTmp(url)
 	if err != nil {
 		return err
 	}
 	tmpPath := tmp.Name()
-	_ = tmp.Close()
 	defer func() { _ = os.Remove(tmpPath) }()
+	defer func() { _ = tmp.Close() }()
 
-	if err := verifyShasum(tmpPath, pkg.Dist.Shasum); err != nil {
-		return err
+	if want.Hex() != "" {
+		if _, err := tmp.Seek(0, io.SeekStart); err != nil {
+			return err
+		}
+		if err := want.Verify(tmp); err != nil {
+			return fmt.Errorf("zipball %s: %w", url, err)
+		}
 	}
 
 	tmpDir, err := os.MkdirTemp(filepath.Dir(dest), ".odoopack-unzip-*")
@@ -121,31 +134,6 @@ func downloadToTmp(url string) (*os.File, error) {
 	}
 
 	return tmp, nil
-}
-
-func verifyShasum(path, expected string) error {
-	if expected == "" {
-		return nil
-	}
-	algo, want, ok := strings.Cut(expected, ":")
-	if !ok || algo != "sha256" {
-		return fmt.Errorf("unsupported shasum format %q (want sha256:<hex>)", expected)
-	}
-
-	f, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = f.Close() }()
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return err
-	}
-	got := hex.EncodeToString(h.Sum(nil))
-	if !strings.EqualFold(got, want) {
-		return fmt.Errorf("shasum mismatch: got sha256:%s, expected %s — refusing to install a corrupt or tampered zipball", got, expected)
-	}
-	return nil
 }
 
 // Limits on what a zipball may unpack to, so a zip bomb cannot fill the disk.

@@ -23,7 +23,10 @@ var treeCmd = &cobra.Command{
 			fatal(err)
 		}
 
-		lock := lockfile.LoadOrNew()
+		lock, err := lockfile.LoadOrNew()
+		if err != nil {
+			fatal(err)
+		}
 		if len(lock.Packages) == 0 {
 			ui.Info("no dependencies (run 'odoopack install')")
 			return

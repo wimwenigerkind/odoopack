@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/wimwenigerkind/odoopack/pkg/addonsdir"
@@ -139,5 +140,52 @@ func TestInstallAllAdoptsLegacyInstallAfterResolvingAgain(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(m.AddonsPath, name)); err != nil {
 			t.Errorf("%s missing after install: %v", name, err)
 		}
+	}
+}
+
+// install exits the process on an error, so the test runs it in a child
+// process of the test binary.
+func TestInstallRejectsInvalidLockfileName(t *testing.T) {
+	if os.Getenv("ODOOPACK_TEST_INSTALL") == "1" {
+		installCmd.Run(installCmd, nil)
+		return
+	}
+
+	dir := t.TempDir()
+	files := map[string]string{
+		"odoopack.json": `{"name":"test","odoo":"19.0","require":{"acme/health-check":"19.0"},"addons_path":"addons/odoopack"}`,
+		"odoopack.lock": `{"content_hash":"sha256:00","packages":{"../evil":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/x.git"}}}}`,
+		filepath.Join("addons", "odoopack", addonsdir.MarkerName):                   "",
+		filepath.Join("addons", "odoopack", "acme_health_check", "__manifest__.py"): "{}",
+	}
+	for name, content := range files {
+		path := filepath.Join(dir, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	cmd := exec.Command(os.Args[0], "-test.run=^TestInstallRejectsInvalidLockfileName$")
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "ODOOPACK_TEST_INSTALL=1")
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("install succeeded:\n%s", out)
+	}
+	if !strings.Contains(string(out), "odoopack.lock") || !strings.Contains(string(out), "../evil") {
+		t.Fatalf("output does not name the lockfile and the invalid name:\n%s", out)
+	}
+
+	for name, content := range files {
+		got, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil || string(got) != content {
+			t.Errorf("%s changed: %q, %v", name, got, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(dir, "evil")); !os.IsNotExist(err) {
+		t.Errorf("evil exists: %v", err)
 	}
 }

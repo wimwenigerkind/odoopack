@@ -9,7 +9,7 @@ import (
 	"github.com/wimwenigerkind/odoopack/pkg/ui"
 )
 
-var name string
+var projectName string
 var odoo string
 
 var initCmd = &cobra.Command{
@@ -17,7 +17,7 @@ var initCmd = &cobra.Command{
 	Short: "Initialize a new odoopack project",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		m, err := manifest.Init(name, odoo)
+		m, err := manifest.Init(projectName, odoo)
 		if err != nil {
 			fatal(err)
 		}
@@ -27,6 +27,6 @@ var initCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(initCmd)
-	initCmd.Flags().StringVarP(&name, "name", "n", "odoopack", "Project name")
+	initCmd.Flags().StringVarP(&projectName, "name", "n", "odoopack", "Project name")
 	initCmd.Flags().StringVar(&odoo, "odoo", "19.0", "Target Odoo series")
 }

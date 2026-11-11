@@ -29,6 +29,10 @@ var requireCmd = &cobra.Command{
 			fatal(err)
 		}
 		checkAddonsPath(m)
+		oldLock, err := lockfile.LoadOrNew()
+		if err != nil {
+			fatal(err)
+		}
 
 		constraint := versionArg
 		if constraint == "" {
@@ -47,8 +51,6 @@ var requireCmd = &cobra.Command{
 		if err := manifest.Save(*m); err != nil {
 			fatal(err)
 		}
-
-		oldLock := lockfile.LoadOrNew()
 
 		lockFile, err := lockfile.RecomputeHash(m.Require, m.Indexes, m.Odoo)
 		if err != nil {

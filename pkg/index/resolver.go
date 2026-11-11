@@ -3,19 +3,20 @@ package index
 import (
 	"fmt"
 
-	odoosemver "github.com/wimwenigerkind/odoopack-semver"
+	"github.com/wimwenigerkind/odoopack-spec/registryapi"
+	"github.com/wimwenigerkind/odoopack-spec/version"
 )
 
-func resolveVersion(constraint, odooSeries string, candidates []registryVersion) (*registryVersion, error) {
-	c, err := odoosemver.ParseConstraint(constraint)
+func resolveVersion(constraint, odooSeries string, candidates []registryapi.Version) (*registryapi.Version, error) {
+	c, err := version.ParseConstraint(constraint)
 	if err != nil {
 		return nil, fmt.Errorf("invalid version %q: %w", constraint, err)
 	}
 
-	parsed := make([]odoosemver.Version, 0, len(candidates))
+	parsed := make([]version.Version, 0, len(candidates))
 	byVersion := make(map[string]int, len(candidates))
 	for i := range candidates {
-		v, err := odoosemver.Parse(candidates[i].Version)
+		v, err := version.Parse(candidates[i].Version)
 		if err != nil {
 			continue
 		}
@@ -23,7 +24,7 @@ func resolveVersion(constraint, odooSeries string, candidates []registryVersion)
 		byVersion[v.String()] = i
 	}
 
-	best, ok := odoosemver.Resolve(c, parsed)
+	best, ok := version.Resolve(c, parsed)
 	if !ok {
 		return nil, fmt.Errorf("no version matches %q", constraint)
 	}

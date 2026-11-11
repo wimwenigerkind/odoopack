@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"github.com/spf13/cobra"
+	"github.com/wimwenigerkind/odoopack-spec/name"
 	"github.com/wimwenigerkind/odoopack/pkg/addonsdir"
 	"github.com/wimwenigerkind/odoopack/pkg/installer"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
@@ -33,7 +34,10 @@ var installCmd = &cobra.Command{
 			return
 		}
 
-		lock := lockfile.LoadOrNew()
+		lock, err := lockfile.LoadOrNew()
+		if err != nil {
+			fatal(err)
+		}
 		previous := lock
 
 		isStale, err := lockfile.IsStale(m.Require, m.Indexes, lock.Packages, lock.ContentHash)
@@ -103,8 +107,8 @@ func checkAddonsPath(m *manifest.Manifest) {
 func lockedDirs(locks ...map[string]lockfile.LockedPackage) map[string]bool {
 	dirs := make(map[string]bool)
 	for _, packages := range locks {
-		for name := range packages {
-			dirs[installer.FormatAddonDir(name)] = true
+		for addon := range packages {
+			dirs[name.ModuleName(addon)] = true
 		}
 	}
 	return dirs

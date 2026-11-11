@@ -116,6 +116,29 @@ func TestZipInstallRejectsShasumMismatch(t *testing.T) {
 	}
 }
 
+func TestZipInstallRejectsMalformedShasum(t *testing.T) {
+	srv, shasum, downloads := serveAddonZip(t)
+	for _, malformed := range []string{
+		"sha256",
+		"md5:" + strings.TrimPrefix(shasum, "sha256:"),
+		shasum[:len(shasum)-1],
+		shasum[:len(shasum)-1] + "z",
+	} {
+		pkg := lockfile.LockedPackage{Dist: lockfile.Dist{Type: "zip", URL: srv.URL, Shasum: malformed}}
+		target := filepath.Join(t.TempDir(), "addons")
+		err := NewZipInstaller(store.New(t.TempDir())).Install(target, "acme/health-check", pkg)
+		if err == nil || !strings.HasPrefix(err.Error(), "digest:") {
+			t.Errorf("shasum %q: got error %v, want a digest error", malformed, err)
+		}
+		if _, err := os.Stat(target); !os.IsNotExist(err) {
+			t.Errorf("shasum %q: target was created: %v", malformed, err)
+		}
+	}
+	if n := downloads.Load(); n != 0 {
+		t.Fatalf("downloaded %d times, want 0", n)
+	}
+}
+
 type zipEntry struct {
 	name string
 	mode fs.FileMode

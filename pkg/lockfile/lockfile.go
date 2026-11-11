@@ -7,22 +7,30 @@ import (
 	"os"
 
 	"github.com/spf13/viper"
+	"github.com/wimwenigerkind/odoopack-spec/name"
 	"github.com/wimwenigerkind/odoopack/pkg/helper"
 	"github.com/wimwenigerkind/odoopack/pkg/index"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
 )
 
-func LoadOrNew() LockFile {
+// LoadOrNew returns an empty lockfile when none exists. Any other problem is
+// an error, so that a lockfile with an invalid name is not silently replaced.
+func LoadOrNew() (LockFile, error) {
+	exists, err := helper.FileExists(viper.GetString("lock"))
+	if err != nil {
+		return LockFile{}, err
+	}
+	if !exists {
+		return LockFile{Packages: make(map[string]LockedPackage)}, nil
+	}
 	lf, err := Load()
 	if err != nil {
-		return LockFile{
-			Packages: make(map[string]LockedPackage),
-		}
+		return LockFile{}, err
 	}
 	if lf.Packages == nil {
 		lf.Packages = make(map[string]LockedPackage)
 	}
-	return lf
+	return lf, nil
 }
 
 func Load() (LockFile, error) {
@@ -42,6 +50,11 @@ func Load() (LockFile, error) {
 	var lockFile LockFile
 	if err := json.Unmarshal(data, &lockFile); err != nil {
 		return LockFile{}, err
+	}
+	for pkg := range lockFile.Packages {
+		if err := name.ValidPackage(pkg); err != nil {
+			return LockFile{}, fmt.Errorf("%s: %w", viper.GetString("lock"), err)
+		}
 	}
 
 	return lockFile, nil

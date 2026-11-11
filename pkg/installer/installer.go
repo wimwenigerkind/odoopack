@@ -2,7 +2,9 @@ package installer
 
 import (
 	"fmt"
-	"strings"
+	"path/filepath"
+
+	"github.com/wimwenigerkind/odoopack-spec/name"
 
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 	"github.com/wimwenigerkind/odoopack/pkg/store"
@@ -27,6 +29,10 @@ func New(sourceType string) (Installer, error) {
 	}
 }
 
-func FormatAddonDir(name string) string {
-	return strings.NewReplacer("/", "_", "-", "_").Replace(name)
+// addonDir returns the directory addonName installs to in targetDir.
+func addonDir(targetDir, addonName string) (string, error) {
+	if err := name.ValidPackage(addonName); err != nil {
+		return "", err
+	}
+	return filepath.Join(targetDir, name.ModuleName(addonName)), nil
 }

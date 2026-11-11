@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/wimwenigerkind/odoopack-spec/name"
 	"github.com/wimwenigerkind/odoopack/pkg/addonsdir"
-	"github.com/wimwenigerkind/odoopack/pkg/installer"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
 	"github.com/wimwenigerkind/odoopack/pkg/ui"
@@ -40,8 +40,11 @@ var removeCmd = &cobra.Command{
 			fatal(fmt.Errorf("addon is not installed"))
 		}
 
-		lock := lockfile.LoadOrNew()
-		if err := addonsdir.RemoveAddon(m.AddonsPath, installer.FormatAddonDir(addonName), lockedDirs(lock.Packages)); err != nil {
+		lock, err := lockfile.LoadOrNew()
+		if err != nil {
+			fatal(err)
+		}
+		if err := addonsdir.RemoveAddon(m.AddonsPath, name.ModuleName(addonName), lockedDirs(lock.Packages)); err != nil {
 			fatal(err)
 		}
 

@@ -16,6 +16,10 @@ func NewGitInstaller() *GitInstaller {
 }
 
 func (i *GitInstaller) Install(targetDir string, addonName string, pkg lockfile.LockedPackage) error {
+	dest, err := addonDir(targetDir, addonName)
+	if err != nil {
+		return err
+	}
 	if err := os.MkdirAll(targetDir, 0755); err != nil {
 		return err
 	}
@@ -42,7 +46,6 @@ func (i *GitInstaller) Install(targetDir string, addonName string, pkg lockfile.
 		return err
 	}
 
-	dest := filepath.Join(targetDir, FormatAddonDir(addonName))
 	if err := os.RemoveAll(dest); err != nil {
 		return err
 	}

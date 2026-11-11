@@ -39,7 +39,10 @@ var updateCmd = &cobra.Command{
 }
 
 func updateAll(m *manifest.Manifest) {
-	previous := lockfile.LoadOrNew()
+	previous, err := lockfile.LoadOrNew()
+	if err != nil {
+		fatal(err)
+	}
 	lock, err := lockfile.RecomputeHash(m.Require, m.Indexes, m.Odoo)
 	if err != nil {
 		fatal(err)
@@ -64,7 +67,10 @@ func updateOne(m *manifest.Manifest, name string) {
 		fatal(err)
 	}
 
-	lock := lockfile.LoadOrNew()
+	lock, err := lockfile.LoadOrNew()
+	if err != nil {
+		fatal(err)
+	}
 	lock.Packages[lookup.Name] = lockfile.LockedPackage{
 		Version: lookup.Version,
 		Dist: lockfile.Dist{
