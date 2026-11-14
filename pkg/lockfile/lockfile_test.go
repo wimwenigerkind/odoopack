@@ -215,3 +215,44 @@ func TestPreviousHashIsNotStale(t *testing.T) {
 		t.Fatalf("lockfile from the previous odoopack is not stale (%v) after changing require", err)
 	}
 }
+
+func TestCheckModuleCollisions(t *testing.T) {
+	tests := []struct {
+		name     string
+		packages []string
+		wantErr  string
+	}{
+		{"none", []string{"acme/a-b", "acme/a-c", "acme/b"}, ""},
+		{"empty", nil, ""},
+		{"dash and underscore", []string{"acme/a-b", "acme/a_b"}, "packages acme/a-b and acme/a_b both install to the addon directory acme_a_b"},
+		{"slash and underscore", []string{"acme-a/b", "acme_a/b"}, "packages acme-a/b and acme_a/b both install to the addon directory acme_a_b"},
+		{"three ways", []string{"acme/a_b", "acme-a/b", "acme/a-b", "acme/c"}, "both install to the addon directory acme_a_b"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			packages := make(map[string]LockedPackage)
+			for _, pkg := range tt.packages {
+				packages[pkg] = LockedPackage{}
+			}
+			err := CheckModuleCollisions(packages)
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("got error %v, want one containing %q", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestLoadRejectsModuleCollision(t *testing.T) {
+	path := useLock(t, `{"content_hash":"sha256:00","packages":{"acme/a-b":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/x.git"}},"acme/a_b":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/y.git"}}}}`)
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), path) || !strings.Contains(err.Error(), "acme/a-b and acme/a_b") {
+		t.Fatalf("got error %v, want one naming %s and both packages", err, path)
+	}
+}

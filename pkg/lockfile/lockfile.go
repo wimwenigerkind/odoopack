@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 
 	"github.com/spf13/viper"
 	"github.com/wimwenigerkind/odoopack-spec/digest"
@@ -66,8 +67,32 @@ func Load() (LockFile, error) {
 			return LockFile{}, fmt.Errorf("%s: %w", viper.GetString("lock"), err)
 		}
 	}
+	if err := CheckModuleCollisions(lockFile.Packages); err != nil {
+		return LockFile{}, fmt.Errorf("%s: %w", viper.GetString("lock"), err)
+	}
 
 	return lockFile, nil
+}
+
+// CheckModuleCollisions refuses packages that install into the same addon
+// directory, since one would silently overwrite the other: name.ModuleName
+// maps both "/" and "-" to "_".
+func CheckModuleCollisions(packages map[string]LockedPackage) error {
+	names := make([]string, 0, len(packages))
+	for pkg := range packages {
+		names = append(names, pkg)
+	}
+	sort.Strings(names)
+
+	owners := make(map[string]string, len(names))
+	for _, pkg := range names {
+		dir := name.ModuleName(pkg)
+		if other, taken := owners[dir]; taken {
+			return fmt.Errorf("packages %s and %s both install to the addon directory %s", other, pkg, dir)
+		}
+		owners[dir] = pkg
+	}
+	return nil
 }
 
 func Save(lockFile LockFile) error {
@@ -185,6 +210,9 @@ func RecomputeHash(require map[string]string, indexes manifest.Indexes, odooSeri
 			return LockFile{}, err
 		}
 		packages[lookup.Name] = locked
+	}
+	if err := CheckModuleCollisions(packages); err != nil {
+		return LockFile{}, err
 	}
 
 	hash, err := ComputeHash(require, indexes, odooSeries, packages)

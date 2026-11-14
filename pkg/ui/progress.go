@@ -13,6 +13,13 @@ type Task struct {
 	Label string
 }
 
+// maxParallelTasks bounds how many tasks run at once. Each install holds an
+// HTTP connection or a git process and a few open files: a lockfile with a
+// hundred packages must not open a hundred connections to one registry, run
+// into its rate limit or the open file limit, or split the bandwidth so thin
+// that every download is slow. Eight keeps a typical project fast.
+const maxParallelTasks = 8
+
 func RunTasks(title string, tasks []Task, run func(i int) error) error {
 	if len(tasks) == 0 {
 		return nil
@@ -28,21 +35,32 @@ func runTasksPlain(title string, tasks []Task, run func(i int) error) error {
 		fmt.Println(title)
 	}
 	states := make([]taskState, len(tasks))
-	var wg sync.WaitGroup
 	var mu sync.Mutex
-	for i := range tasks {
+	runBounded(len(tasks), func(i int) {
+		err := run(i)
+		mu.Lock()
+		states[i].err = err
+		fmt.Println("  " + renderTask(tasks[i].Label, true, err, ""))
+		mu.Unlock()
+	})
+	return firstErr(states)
+}
+
+// runBounded calls run for 0 to n-1 with at most maxParallelTasks calls at
+// once and returns when all of them have returned.
+func runBounded(n int, run func(i int)) {
+	sem := make(chan struct{}, maxParallelTasks)
+	var wg sync.WaitGroup
+	for i := range n {
+		sem <- struct{}{}
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			err := run(i)
-			mu.Lock()
-			states[i].err = err
-			fmt.Println("  " + renderTask(tasks[i].Label, true, err, ""))
-			mu.Unlock()
+			defer func() { <-sem }()
+			run(i)
 		}(i)
 	}
 	wg.Wait()
-	return firstErr(states)
 }
 
 type taskState struct {
@@ -122,17 +140,10 @@ func runTasksTUI(title string, tasks []Task, run func(i int) error) error {
 		states:  make([]taskState, len(tasks)),
 	})
 
-	go func() {
-		var wg sync.WaitGroup
-		for i := range tasks {
-			wg.Add(1)
-			go func(i int) {
-				defer wg.Done()
-				program.Send(taskDoneMsg{index: i, err: run(i)})
-			}(i)
-		}
-		wg.Wait()
-	}()
+	// Waiting tasks keep their spinner, so the display still lists every task.
+	go runBounded(len(tasks), func(i int) {
+		program.Send(taskDoneMsg{index: i, err: run(i)})
+	})
 
 	final, err := program.Run()
 	if err != nil {

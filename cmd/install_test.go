@@ -220,6 +220,24 @@ func TestInstallRejectsInvalidLockfileName(t *testing.T) {
 	}
 }
 
+func TestInstallRejectsModuleCollision(t *testing.T) {
+	if runInstallIfChild() {
+		return
+	}
+
+	// The content hash is stale on purpose: install must stop before it would
+	// resolve again, clear addons_path or download anything.
+	_, out := installInChild(t, map[string]string{
+		"odoopack.json": unreachableManifest,
+		"odoopack.lock": `{"content_hash":"sha256:00","packages":{"acme/health-check":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/x.git"}},"acme/health_check":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/y.git"}}}}`,
+		filepath.Join("addons", "odoopack", addonsdir.MarkerName):                   "",
+		filepath.Join("addons", "odoopack", "acme_health_check", "__manifest__.py"): "{}",
+	}, "ODOOPACK_FROZEN_LOCKFILE=0")
+	if strings.Contains(out, "resolving") || !strings.Contains(out, "odoopack.lock") || !strings.Contains(out, "acme/health-check and acme/health_check") {
+		t.Fatalf("output does not refuse the lockfile and name both packages:\n%s", out)
+	}
+}
+
 func TestInstallRejectsNewerLockfileFormat(t *testing.T) {
 	if runInstallIfChild() {
 		return
