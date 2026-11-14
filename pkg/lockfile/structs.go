@@ -13,6 +13,10 @@ type LockedPackage struct {
 	Direct   bool     `json:"direct"`
 	Depends  []string `json:"depends,omitempty"`
 	External []string `json:"external,omitempty"`
+	// Index names the index the package was resolved from, so that later
+	// resolutions ask that index only. Lockfiles written before the field
+	// existed lack it.
+	Index string `json:"index,omitempty"`
 }
 
 // Format is the lockfile format this odoopack writes. Raise it only when an

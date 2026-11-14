@@ -33,6 +33,8 @@ $ odoopack index add company https://registry.example.com
 $ odoopack require acme/health-check@19.0.1.0.0
 ```
 
+The public default registry is still tried after your indexes, but only for addons your indexes answer with "not found". An expired token or an unavailable private registry stops the resolution with an error instead.
+
 See the [`index`](../commands/index-command.md) command and the [Configuration](../reference/configuration.md) reference.
 
 ## Security

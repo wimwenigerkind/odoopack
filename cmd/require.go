@@ -42,7 +42,7 @@ var requireCmd = &cobra.Command{
 			fatal(fmt.Errorf("no version given and no \"odoo\" series set in the manifest; use %s@<version> (e.g. 19.0.1.0.0 or dev-19.0)", addonName))
 		}
 
-		lookup, err := index.Lookup(m.Indexes, addonName, constraint, m.Odoo)
+		lookup, err := index.LookupLocked(m.Indexes, oldLock.Packages[addonName].Index, addonName, constraint, m.Odoo)
 		if err != nil {
 			fatal(err)
 		}
@@ -52,7 +52,7 @@ var requireCmd = &cobra.Command{
 			fatal(err)
 		}
 
-		lockFile, err := lockfile.RecomputeHash(m.Require, m.Indexes, m.Odoo)
+		lockFile, err := lockfile.RecomputeHash(m.Require, m.Indexes, m.Odoo, oldLock.Packages)
 		if err != nil {
 			fatal(err)
 		}

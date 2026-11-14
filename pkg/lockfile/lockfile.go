@@ -136,7 +136,9 @@ type resolveItem struct {
 	direct     bool
 }
 
-func RecomputeHash(require map[string]string, indexes manifest.Indexes, odooSeries string) (LockFile, error) {
+// RecomputeHash resolves require again. A package in locked is resolved from
+// the index it is locked to.
+func RecomputeHash(require map[string]string, indexes manifest.Indexes, odooSeries string, locked map[string]LockedPackage) (LockFile, error) {
 	packages := make(map[string]LockedPackage)
 
 	queue := make([]resolveItem, 0, len(require))
@@ -151,7 +153,7 @@ func RecomputeHash(require map[string]string, indexes manifest.Indexes, odooSeri
 			continue
 		}
 
-		lookup, err := index.Lookup(indexes, item.name, item.constraint, odooSeries)
+		lookup, err := index.LookupLocked(indexes, locked[item.name].Index, item.name, item.constraint, odooSeries)
 		if err != nil {
 			return LockFile{}, err
 		}
@@ -210,6 +212,7 @@ func lockPackage(lookup index.AddonVersion, direct bool, deps, external []string
 		Direct:   direct,
 		Depends:  deps,
 		External: external,
+		Index:    lookup.Index,
 	}
 	if err := pkg.Dist.CheckIntegrity(); err != nil {
 		return LockedPackage{}, fmt.Errorf("%s %s: %w", lookup.Name, lookup.Version, err)

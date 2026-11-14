@@ -30,7 +30,7 @@ Aliases: `add`, `req`.
 1. Loads `odoopack.json` (run [`init`](init.md) first if it is missing).
 2. Resolves the addon through the configured [indexes](index-command.md).
 3. Adds the requirement to `odoopack.json`.
-4. Writes the resolved version, distribution type, URL, reference, and checksum to `odoopack.lock` and recomputes its content hash.
+4. Writes the resolved version, distribution type, URL, reference, checksum, and index name to `odoopack.lock` and recomputes its content hash.
 5. Installs the single addon into the addons path.
 
 To add many addons at once, run `require` per addon, or edit `odoopack.json` and run [`install`](install.md).

@@ -36,4 +36,4 @@ The manifest describes your project: which addons it requires and which registri
 | `url` | string | Registry base URL, including scheme and host. |
 | `type` | string | Index type. `registry` is currently the only supported type. |
 
-Indexes are tried in alphabetical order by name during resolution. If none match, the built-in default registry is tried last. See [Configuration](configuration.md).
+Indexes are tried in alphabetical order by name during resolution, and only an index that does not have the addon passes it on to the next one. The built-in default registry is tried last. See [index](../commands/index-command.md#resolution-order).

@@ -52,7 +52,7 @@ var installCmd = &cobra.Command{
 		}
 		if isStale {
 			ui.Info("lockfile is stale, resolving")
-			lock, err = lockfile.RecomputeHash(m.Require, m.Indexes, m.Odoo)
+			lock, err = lockfile.RecomputeHash(m.Require, m.Indexes, m.Odoo, lock.Packages)
 			if err != nil {
 				fatal(err)
 			}

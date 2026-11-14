@@ -16,7 +16,8 @@ The lockfile pins the exact distribution of every requirement so that installs a
         "url": "https://registry.example.com/registry/v1/zipball/<id>/<reference>",
         "reference": "<git-sha>",
         "shasum": "sha256:<hex>"
-      }
+      },
+      "index": "company"
     }
   }
 }
@@ -39,6 +40,7 @@ The lockfile pins the exact distribution of every requirement so that installs a
 | `dist.url` | string | Download URL (zip) or clone URL (git). |
 | `dist.reference` | string | Git reference (commit SHA) the distribution was built from. |
 | `dist.shasum` | string | `sha256:` checksum of the zip. Verified on install; a mismatch aborts the install. |
+| `index` | string | Name of the index the package was resolved from, or `default` for the built-in default registry. Later resolutions ask this index only, as long as the manifest still has an index with this name. Missing in lockfiles written by earlier releases; such a package is resolved as if it were new. |
 
 ## Staleness
 

@@ -15,6 +15,9 @@ import (
 	"github.com/wimwenigerkind/odoopack/pkg/ui"
 )
 
+// httpClient is a variable so that tests can give it a short timeout.
+var httpClient = http.DefaultClient
+
 type RegistryProvider struct {
 	BaseURL string
 	Token   string
@@ -45,7 +48,7 @@ func (p *RegistryProvider) Lookup(addonName, constraint, odooSeries string) (Add
 		req.Header.Set("Authorization", "Bearer "+p.Token)
 	}
 
-	response, err := http.DefaultClient.Do(req)
+	response, err := httpClient.Do(req)
 	if err != nil {
 		return AddonVersion{}, err
 	}
@@ -59,9 +62,9 @@ func (p *RegistryProvider) Lookup(addonName, constraint, odooSeries string) (Add
 		return AddonVersion{}, fmt.Errorf("access denied at %s%s", p.BaseURL, problemDetail(response))
 	case http.StatusNotFound:
 		if p.Token == "" {
-			return AddonVersion{}, fmt.Errorf("addon %q not found at %s (set ODOOPACK_AUTH if the registry is private)", addonName, p.BaseURL)
+			return AddonVersion{}, fmt.Errorf("addon %q %w at %s (set ODOOPACK_AUTH if the registry is private)", addonName, ErrNotFound, p.BaseURL)
 		}
-		return AddonVersion{}, fmt.Errorf("addon %q not found at %s (or your token has no access)", addonName, p.BaseURL)
+		return AddonVersion{}, fmt.Errorf("addon %q %w at %s (or your token has no access)", addonName, ErrNotFound, p.BaseURL)
 	default:
 		return AddonVersion{}, fmt.Errorf("registry %s returned %s%s", p.BaseURL, response.Status, problemDetail(response))
 	}

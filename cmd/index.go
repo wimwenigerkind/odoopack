@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/wimwenigerkind/odoopack/pkg/index"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
 	"github.com/wimwenigerkind/odoopack/pkg/ui"
 )
@@ -99,8 +100,8 @@ var indexListCmd = &cobra.Command{
 		}
 
 		defaultURL := viper.GetString("default_index_url")
-		if defaultURL != "" && shouldShowImplicitDefault(m.Indexes, defaultURL) {
-			rows = append(rows, []string{"default", defaultURL, "registry", "implicit"})
+		if index.UsesImplicitDefault(m.Indexes, defaultURL) {
+			rows = append(rows, []string{index.DefaultIndexName, defaultURL, "registry", "implicit"})
 		}
 
 		if len(rows) == 0 {
@@ -110,18 +111,6 @@ var indexListCmd = &cobra.Command{
 
 		ui.Println(ui.Table([]string{"Name", "URL", "Type", "Source"}, rows))
 	},
-}
-
-func shouldShowImplicitDefault(indexes manifest.Indexes, defaultURL string) bool {
-	if _, hasDefault := indexes["default"]; hasDefault {
-		return false
-	}
-	for _, idx := range indexes {
-		if idx.Url == defaultURL {
-			return false
-		}
-	}
-	return true
 }
 
 func init() {

@@ -43,7 +43,7 @@ func updateAll(m *manifest.Manifest) {
 	if err != nil {
 		fatal(err)
 	}
-	lock, err := lockfile.RecomputeHash(m.Require, m.Indexes, m.Odoo)
+	lock, err := lockfile.RecomputeHash(m.Require, m.Indexes, m.Odoo, previous.Packages)
 	if err != nil {
 		fatal(err)
 	}
@@ -62,12 +62,12 @@ func updateOne(m *manifest.Manifest, name string) {
 		fatal(fmt.Errorf("%s is not a required addon", name))
 	}
 
-	lookup, err := index.Lookup(m.Indexes, name, version, m.Odoo)
+	lock, err := lockfile.LoadOrNew()
 	if err != nil {
 		fatal(err)
 	}
 
-	lock, err := lockfile.LoadOrNew()
+	lookup, err := index.LookupLocked(m.Indexes, lock.Packages[name].Index, name, version, m.Odoo)
 	if err != nil {
 		fatal(err)
 	}
@@ -79,6 +79,7 @@ func updateOne(m *manifest.Manifest, name string) {
 			Reference: lookup.Reference,
 			Shasum:    lookup.Shasum,
 		},
+		Index: lookup.Index,
 	}
 	lock.ContentHash, err = lockfile.ComputeHash(m.Require, m.Indexes, m.Odoo, lock.Packages)
 	if err != nil {
