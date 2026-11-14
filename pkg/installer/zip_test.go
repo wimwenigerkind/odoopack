@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/spf13/viper"
 	"github.com/wimwenigerkind/odoopack/pkg/buildinfo"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 	"github.com/wimwenigerkind/odoopack/pkg/store"
@@ -297,7 +298,7 @@ func TestDownloadSendsUserAgent(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	tmp, err := downloadToTmp(srv.URL)
+	tmp, err := downloadToTmp(srv.URL, maxZipballBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -305,5 +306,57 @@ func TestDownloadSendsUserAgent(t *testing.T) {
 	_ = os.Remove(tmp.Name())
 	if got := userAgent.Load(); got != "odoopack/1.2.3" {
 		t.Fatalf("got User-Agent %v, want odoopack/1.2.3", got)
+	}
+}
+
+func TestDownloadLeavesNoTempFileOnError(t *testing.T) {
+	closed := httptest.NewServer(http.NotFoundHandler())
+	closed.Close()
+
+	for _, tc := range []struct {
+		name    string
+		handler http.HandlerFunc
+		url     string
+		auth    string
+		wantErr string
+	}{
+		{name: "network", url: closed.URL, wantErr: "connect"},
+		{name: "status", handler: func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNotFound) }, wantErr: "bad status 404"},
+		{name: "truncated", handler: func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Length", "100")
+			_, _ = w.Write([]byte("short"))
+		}, wantErr: "unexpected EOF"},
+		{name: "limit", handler: func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(make([]byte, 11)) }, wantErr: "size limit"},
+		{name: "token over http", url: "http://registry.example.com/zipball/1", auth: `{"bearer":{"registry.example.com":"secret"}}`, wantErr: "plain http"},
+		{name: "malformed auth", url: "https://registry.example.com/zipball/1", auth: `{"bearer":`, wantErr: "ODOOPACK_AUTH"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			t.Setenv("TMPDIR", tmpDir)
+			viper.Set("auth", tc.auth)
+			t.Cleanup(viper.Reset)
+			url := tc.url
+			if tc.handler != nil {
+				srv := httptest.NewServer(tc.handler)
+				t.Cleanup(srv.Close)
+				url = srv.URL
+			}
+
+			tmp, err := downloadToTmp(url, 10)
+			if err == nil {
+				_ = tmp.Close()
+				t.Fatal("download succeeded")
+			}
+			if !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("got error %v, want one containing %q", err, tc.wantErr)
+			}
+			left, err := os.ReadDir(tmpDir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(left) != 0 {
+				t.Fatalf("left %v in the temp directory", left)
+			}
+		})
 	}
 }

@@ -249,3 +249,33 @@ func TestGitCommandBlocksLocalRepository(t *testing.T) {
 		}
 	}
 }
+
+func TestGitCommandRunsSSHInBatchMode(t *testing.T) {
+	var ssh string
+	for _, kv := range gitCommand(t.TempDir(), "version").Env {
+		if v, ok := strings.CutPrefix(kv, "GIT_SSH_COMMAND="); ok {
+			ssh = v
+		}
+	}
+	if !strings.Contains(ssh, "BatchMode") {
+		t.Fatalf("got GIT_SSH_COMMAND %q, want BatchMode", ssh)
+	}
+}
+
+func TestBatchSSHCommandKeepsTheUsersCommand(t *testing.T) {
+	for _, tc := range []struct {
+		env, config, gitSSH, want string
+	}{
+		{"", "", "", "ssh -o BatchMode=yes"},
+		{"ssh -i ~/.ssh/deploy", "", "", "ssh -i ~/.ssh/deploy -o BatchMode=yes"},
+		{"", "ssh -i ~/.ssh/deploy", "", "ssh -i ~/.ssh/deploy -o BatchMode=yes"},
+		{"ssh -i env", "ssh -i config", "", "ssh -i env -o BatchMode=yes"},
+		{"ssh -o batchmode=no", "", "", "ssh -o batchmode=no"},
+		{"", "", "plink", ""},
+		{"", "ssh -i config", "plink", "ssh -i config -o BatchMode=yes"},
+	} {
+		if got := batchSSHCommand(tc.env, tc.config, tc.gitSSH); got != tc.want {
+			t.Errorf("batchSSHCommand(%q, %q, %q) = %q, want %q", tc.env, tc.config, tc.gitSSH, got, tc.want)
+		}
+	}
+}

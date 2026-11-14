@@ -24,6 +24,8 @@ A token is matched against a registry by host. Both the bare host (`registry.exa
 
 Because the value is keyed by host, a single `ODOOPACK_AUTH` can hold tokens for several registries at once.
 
+When `ODOOPACK_AUTH` is set but is not a JSON object of this form, for example because of a typo in `bearer`, odoopack stops with an error instead of resolving without a token.
+
 ## Pointing a project at a private registry
 
 Add the registry as an index in the manifest, then require addons as usual:
@@ -41,3 +43,5 @@ See the [`index`](../commands/index-command.md) command and the [Configuration](
 
 - Never commit `ODOOPACK_AUTH` or raw tokens to the repository.
 - In CI, store the token as a secret and pass it through the environment. See [CI with GitHub Actions](ci-github-actions.md).
+- A token is only sent over `https`. Plain `http` is allowed for `localhost` and loopback addresses, for a registry under development; for any other `http://` index that has a token, odoopack stops with an error that names the URL.
+- When a registry redirects to another scheme, host or port, the token is not sent along, and a redirect from `https` to `http` is refused.

@@ -1,6 +1,7 @@
 package index
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,12 +12,17 @@ import (
 
 	"github.com/wimwenigerkind/odoopack-spec/name"
 	"github.com/wimwenigerkind/odoopack-spec/registryapi"
-	"github.com/wimwenigerkind/odoopack/pkg/buildinfo"
+	"github.com/wimwenigerkind/odoopack/pkg/httpclient"
 	"github.com/wimwenigerkind/odoopack/pkg/ui"
 )
 
+// maxMetadataBytes caps the metadata of one addon. It holds every version
+// with its dependencies, which stays far below this even for an addon with
+// hundreds of releases.
+const maxMetadataBytes = 8 << 20
+
 // httpClient is a variable so that tests can give it a short timeout.
-var httpClient = http.DefaultClient
+var httpClient = httpclient.Metadata
 
 type RegistryProvider struct {
 	BaseURL string
@@ -39,13 +45,9 @@ func (p *RegistryProvider) Lookup(addonName, constraint, odooSeries string) (Add
 		return AddonVersion{}, fmt.Errorf("invalid registry url: %w", err)
 	}
 
-	req, err := http.NewRequest(http.MethodGet, endpoint.String(), nil)
+	req, err := httpclient.NewRequest(context.Background(), endpoint.String(), p.Token)
 	if err != nil {
 		return AddonVersion{}, err
-	}
-	req.Header.Set("User-Agent", buildinfo.UserAgent())
-	if p.Token != "" {
-		req.Header.Set("Authorization", "Bearer "+p.Token)
 	}
 
 	response, err := httpClient.Do(req)
@@ -69,9 +71,9 @@ func (p *RegistryProvider) Lookup(addonName, constraint, odooSeries string) (Add
 		return AddonVersion{}, fmt.Errorf("registry %s returned %s%s", p.BaseURL, response.Status, problemDetail(response))
 	}
 
-	body, err := io.ReadAll(response.Body)
+	body, err := httpclient.ReadAll(response.Body, maxMetadataBytes)
 	if err != nil {
-		return AddonVersion{}, err
+		return AddonVersion{}, fmt.Errorf("registry %s: %w", p.BaseURL, err)
 	}
 
 	var addon registryapi.Addon

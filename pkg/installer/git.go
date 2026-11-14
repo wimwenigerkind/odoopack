@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 )
@@ -104,7 +105,41 @@ func gitCommand(dir string, args ...string) *exec.Cmd {
 	cmd := exec.Command("git", append([]string{"-c", "protocol.file.allow=never"}, args...)...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ALLOW_PROTOCOL=https:ssh")
+	if ssh := sshCommand(); ssh != "" {
+		cmd.Env = append(cmd.Env, "GIT_SSH_COMMAND="+ssh)
+	}
 	return cmd
+}
+
+// sshCommand is the ssh command git runs, read once from the environment and
+// the git config.
+var sshCommand = sync.OnceValue(func() string {
+	configured, _ := exec.Command("git", "config", "--get", "core.sshCommand").Output()
+	return batchSSHCommand(os.Getenv("GIT_SSH_COMMAND"), strings.TrimSpace(string(configured)), os.Getenv("GIT_SSH"))
+})
+
+// batchSSHCommand returns the ssh command git would use with BatchMode on, so
+// that a host key or password prompt fails instead of hanging, or "" to leave
+// git's choice alone. It keeps the user's command, in git's order of
+// GIT_SSH_COMMAND, core.sshCommand and GIT_SSH, and appends the option:
+// git itself appends ssh options to that command, so a wrapper already has
+// to pass them on. A GIT_SSH program may not be OpenSSH at all, such as
+// plink, so it is left as it is.
+func batchSSHCommand(envCommand, configCommand, gitSSH string) string {
+	command := envCommand
+	if command == "" {
+		command = configCommand
+	}
+	if command == "" {
+		if gitSSH != "" {
+			return ""
+		}
+		command = "ssh"
+	}
+	if strings.Contains(strings.ToLower(command), "batchmode") {
+		return command
+	}
+	return command + " -o BatchMode=yes"
 }
 
 // checkGitURL accepts https and ssh URLs and the scp-like ssh form

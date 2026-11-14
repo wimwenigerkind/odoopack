@@ -2,6 +2,7 @@ package index
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -10,8 +11,11 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/spf13/viper"
 	"github.com/wimwenigerkind/odoopack-spec/registryapi"
 	"github.com/wimwenigerkind/odoopack/pkg/buildinfo"
+	"github.com/wimwenigerkind/odoopack/pkg/httpclient"
+	"github.com/wimwenigerkind/odoopack/pkg/manifest"
 )
 
 const testShasum = "sha256:ece96e65881389c3ef6538ea26b9d7149e8e0af042c828d17283c6b76c633543"
@@ -160,5 +164,62 @@ func TestRegistryLookupSendsUserAgent(t *testing.T) {
 	}
 	if got := userAgent.Load(); got != "odoopack/1.2.3" {
 		t.Fatalf("got User-Agent %v, want odoopack/1.2.3", got)
+	}
+}
+
+func TestRegistryLookupRefusesOversizedMetadata(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"name":"acme/health-check","description":"`))
+		_, _ = w.Write([]byte(strings.Repeat("x", maxMetadataBytes)))
+		_, _ = w.Write([]byte(`"}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	_, err := (&RegistryProvider{BaseURL: srv.URL}).Lookup("acme/health-check", "19.0", "19.0")
+	if !errors.Is(err, httpclient.ErrTooLarge) || !strings.Contains(err.Error(), srv.URL) {
+		t.Fatalf("got error %v, want ErrTooLarge naming the registry", err)
+	}
+}
+
+func TestLookupRefusesTokenOverPlainHTTP(t *testing.T) {
+	useDefault(t, "")
+	viper.Set("auth", `{"bearer":{"registry.example.com":"secret"}}`)
+
+	indexes := manifest.Indexes{"company": {Url: "http://registry.example.com", Type: "registry"}}
+	_, err := Lookup(indexes, "acme/health-check", "19.0", "19.0")
+	if err == nil || !strings.Contains(err.Error(), "index company (http://registry.example.com)") || !strings.Contains(err.Error(), "plain http") {
+		t.Fatalf("got error %v, want the token refused for index company", err)
+	}
+}
+
+func TestLookupSendsTokenOverHTTPToLocalhost(t *testing.T) {
+	var auth atomic.Value
+	url, _ := registry(t, func(w http.ResponseWriter, r *http.Request) {
+		auth.Store(r.Header.Get("Authorization"))
+		serving(w, r)
+	})
+	useDefault(t, "")
+	viper.Set("auth", `{"bearer":{"`+strings.TrimPrefix(url, "http://")+`":"secret"}}`)
+
+	if _, err := Lookup(manifest.Indexes{"local": {Url: url, Type: "registry"}}, "acme/health-check", "19.0", "19.0"); err != nil {
+		t.Fatal(err)
+	}
+	if got := auth.Load(); got != "Bearer secret" {
+		t.Fatalf("got Authorization %v", got)
+	}
+}
+
+func TestLookupFailsOnMalformedAuth(t *testing.T) {
+	url, hits := registry(t, serving)
+	useDefault(t, "")
+	viper.Set("auth", `registry.example.com=secret`)
+
+	_, err := Lookup(manifest.Indexes{"local": {Url: url, Type: "registry"}}, "acme/health-check", "19.0", "19.0")
+	if err == nil || !strings.Contains(err.Error(), "ODOOPACK_AUTH is not valid") {
+		t.Fatalf("got error %v, want ODOOPACK_AUTH refused", err)
+	}
+	if hits.Load() != 0 {
+		t.Fatal("the registry was requested")
 	}
 }

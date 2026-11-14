@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -13,7 +12,7 @@ import (
 
 	"github.com/wimwenigerkind/odoopack-spec/digest"
 	"github.com/wimwenigerkind/odoopack/pkg/auth"
-	"github.com/wimwenigerkind/odoopack/pkg/buildinfo"
+	"github.com/wimwenigerkind/odoopack/pkg/httpclient"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 	"github.com/wimwenigerkind/odoopack/pkg/store"
 )
@@ -66,7 +65,7 @@ func (i *ZipInstaller) Install(targetDir string, addonName string, pkg lockfile.
 // extractZip downloads the zipball at url, verifies it against want and moves
 // its single root directory to dest, which must not exist yet.
 func extractZip(url string, want digest.Digest, dest string) error {
-	tmp, err := downloadToTmp(url)
+	tmp, err := downloadToTmp(url, maxZipballBytes)
 	if err != nil {
 		return err
 	}
@@ -102,37 +101,34 @@ func extractZip(url string, want digest.Digest, dest string) error {
 	return os.Rename(filepath.Join(tmpDir, entries[0].Name()), dest)
 }
 
-func downloadToTmp(url string) (*os.File, error) {
+// downloadToTmp downloads url to a temporary file and returns it open. On an
+// error it leaves no file behind.
+func downloadToTmp(url string, limit int64) (_ *os.File, err error) {
+	token, err := auth.TokenForURL(url)
+	if err != nil {
+		return nil, err
+	}
 	tmp, err := os.CreateTemp("", "odoopack-*.zip")
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		if err != nil {
+			_ = tmp.Close()
+			_ = os.Remove(tmp.Name())
+		}
+	}()
 
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
+	if err = httpclient.Download(tmp, url, token, limit); err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", buildinfo.UserAgent())
-	if token := auth.TokenForURL(url); token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-	response, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = response.Body.Close() }()
-
-	if response.StatusCode != http.StatusOK {
-		_ = os.Remove(tmp.Name())
-		return nil, fmt.Errorf("download %s: bad status %s", url, response.Status)
-	}
-
-	if _, err = io.Copy(tmp, response.Body); err != nil {
-		return nil, err
-	}
-
 	return tmp, nil
 }
+
+// maxZipballBytes caps a download. The registry refuses uploads above 100 MiB
+// by default; this leaves room for an operator who raises that limit while
+// still stopping a server that streams without end.
+const maxZipballBytes = 512 << 20
 
 // Limits on what a zipball may unpack to, so a zip bomb cannot fill the disk.
 // They sit far above the largest Odoo addons.

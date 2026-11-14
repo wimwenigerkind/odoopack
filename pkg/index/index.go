@@ -137,7 +137,11 @@ func LookupLocked(indexes manifest.Indexes, lockedIndex, name, constraint, odooS
 }
 
 func lookupIn(idx manifest.Index, name, constraint, odooSeries string) (AddonVersion, error) {
-	provider, err := NewProvider(idx.Type, idx.Url, auth.TokenForURL(idx.Url))
+	token, err := auth.TokenForURL(idx.Url)
+	if err != nil {
+		return AddonVersion{}, err
+	}
+	provider, err := NewProvider(idx.Type, idx.Url, token)
 	if err != nil {
 		return AddonVersion{}, err
 	}
