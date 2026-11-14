@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/spf13/viper"
+	"github.com/wimwenigerkind/odoopack/pkg/index"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
 )
 
@@ -118,5 +119,45 @@ func TestFormatKeepsContentHash(t *testing.T) {
 	}
 	if got != hash || saved.ContentHash != hash {
 		t.Fatalf("hash after gaining the format is %s (stored %s), want %s", got, saved.ContentHash, hash)
+	}
+}
+
+func TestLockPackageRequiresIntegrity(t *testing.T) {
+	const shasum = "sha256:ece96e65881389c3ef6538ea26b9d7149e8e0af042c828d17283c6b76c633543"
+	const commit = "6b6c390a387c81ee604b602e49ca6c35646cc619"
+	tests := []struct {
+		name    string
+		lookup  index.AddonVersion
+		wantErr string
+	}{
+		{"zip with shasum", index.AddonVersion{Type: "zip", Shasum: shasum}, ""},
+		{"zip without shasum", index.AddonVersion{Type: "zip"}, "zip has no shasum"},
+		{"zip with md5", index.AddonVersion{Type: "zip", Shasum: "md5:00"}, "unsupported algorithm"},
+		{"git with commit", index.AddonVersion{Type: "git", Reference: commit}, ""},
+		{"git with sha256 commit", index.AddonVersion{Type: "git", Reference: strings.Repeat("a", 64)}, ""},
+		{"git without reference", index.AddonVersion{Type: "git"}, "git has no reference"},
+		{"git with tag", index.AddonVersion{Type: "git", Reference: "19.0.1.0.0"}, "must be a full commit id"},
+		{"git with uppercase commit", index.AddonVersion{Type: "git", Reference: strings.ToUpper(commit)}, "must be a full commit id"},
+		{"unknown type", index.AddonVersion{Type: "svn", Shasum: shasum}, `type "svn"`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.lookup.Name = "acme/health-check"
+			tt.lookup.Version = "19.0.1.0.0"
+			tt.lookup.Repository = "https://registry.example.com/zipball/x"
+			pkg, err := lockPackage(tt.lookup, true, nil, nil)
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				if pkg.Dist.Type != tt.lookup.Type || pkg.Dist.Shasum != tt.lookup.Shasum || pkg.Dist.Reference != tt.lookup.Reference {
+					t.Fatalf("locked %+v from %+v", pkg.Dist, tt.lookup)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) || !strings.Contains(err.Error(), "acme/health-check 19.0.1.0.0") {
+				t.Fatalf("got error %v, want one naming the package and containing %q", err, tt.wantErr)
+			}
+		})
 	}
 }

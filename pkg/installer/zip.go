@@ -33,19 +33,18 @@ func (i *ZipInstaller) Install(targetDir string, addonName string, pkg lockfile.
 	if err != nil {
 		return err
 	}
-	var want digest.Digest
-	if pkg.Dist.Shasum != "" {
-		if want, err = digest.Parse(pkg.Dist.Shasum); err != nil {
-			return err
-		}
+	if err := checkIntegrity(addonName, pkg); err != nil {
+		return err
+	}
+	want, err := digest.Parse(pkg.Dist.Shasum)
+	if err != nil {
+		return err
 	}
 	if err := os.MkdirAll(targetDir, 0755); err != nil {
 		return err
 	}
 
-	// Without a shasum there is nothing to look the package up by before
-	// downloading it, so it bypasses the store.
-	if i.store == nil || pkg.Dist.Shasum == "" {
+	if i.store == nil {
 		if err := os.RemoveAll(dest); err != nil {
 			return err
 		}
@@ -64,9 +63,8 @@ func (i *ZipInstaller) Install(targetDir string, addonName string, pkg lockfile.
 	return i.store.Link(entry, dest)
 }
 
-// extractZip downloads the zipball at url, verifies it against want unless
-// want is empty, and moves its single root directory to dest, which must not
-// exist yet.
+// extractZip downloads the zipball at url, verifies it against want and moves
+// its single root directory to dest, which must not exist yet.
 func extractZip(url string, want digest.Digest, dest string) error {
 	tmp, err := downloadToTmp(url)
 	if err != nil {
@@ -76,13 +74,11 @@ func extractZip(url string, want digest.Digest, dest string) error {
 	defer func() { _ = os.Remove(tmpPath) }()
 	defer func() { _ = tmp.Close() }()
 
-	if want.Hex() != "" {
-		if _, err := tmp.Seek(0, io.SeekStart); err != nil {
-			return err
-		}
-		if err := want.Verify(tmp); err != nil {
-			return fmt.Errorf("zipball %s: %w", url, err)
-		}
+	if _, err := tmp.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	if err := want.Verify(tmp); err != nil {
+		return fmt.Errorf("zipball %s: %w", url, err)
 	}
 
 	tmpDir, err := os.MkdirTemp(filepath.Dir(dest), ".odoopack-unzip-*")

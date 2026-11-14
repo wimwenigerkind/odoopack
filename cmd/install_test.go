@@ -1,12 +1,19 @@
 package cmd
 
 import (
+	"archive/zip"
+	"bytes"
+	"crypto/sha256"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/spf13/viper"
 	"github.com/wimwenigerkind/odoopack/pkg/addonsdir"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
@@ -31,31 +38,36 @@ func TestInstallAllRefusesForeignDir(t *testing.T) {
 	}
 }
 
-// addonRepo creates a local git repository holding an addon.
-func addonRepo(t *testing.T) string {
+// addonZip serves a zipball holding an addon and returns its dist. A git
+// package would need an https or ssh server, the only transports the git
+// installer allows.
+func addonZip(t *testing.T) lockfile.Dist {
 	t.Helper()
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not installed")
-	}
-
-	repo := t.TempDir()
-	if err := os.WriteFile(filepath.Join(repo, "__manifest__.py"), []byte("{}"), 0644); err != nil {
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	w, err := zw.Create("addon-1.0/__manifest__.py")
+	if err != nil {
 		t.Fatal(err)
 	}
-	for _, args := range [][]string{
-		{"init", "-q"},
-		{"add", "."},
-		{"-c", "user.name=test", "-c", "user.email=test@example.com", "commit", "-q", "-m", "init"},
-	} {
-		if out, err := exec.Command("git", append([]string{"-C", repo}, args...)...).CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
+	if _, err := w.Write([]byte("{}")); err != nil {
+		t.Fatal(err)
 	}
-	return repo
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	body := buf.Bytes()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(body)
+	}))
+	t.Cleanup(srv.Close)
+
+	viper.Set("no_cache", true)
+	t.Cleanup(viper.Reset)
+	return lockfile.Dist{Type: "zip", URL: srv.URL, Shasum: fmt.Sprintf("sha256:%x", sha256.Sum256(body))}
 }
 
 func TestInstallAllReplacesPreviousInstall(t *testing.T) {
-	repo := addonRepo(t)
+	dist := addonZip(t)
 	t.Chdir(t.TempDir())
 	m := manifest.NewManifest("test", "addons/odoopack", "19.0")
 	if err := addonsdir.Claim(m.AddonsPath, nil); err != nil {
@@ -66,7 +78,7 @@ func TestInstallAllReplacesPreviousInstall(t *testing.T) {
 	}
 
 	lock := lockfile.LockFile{Packages: map[string]lockfile.LockedPackage{
-		"new-addon": {Dist: lockfile.Dist{Type: "git", URL: repo}},
+		"new-addon": {Dist: dist},
 	}}
 	if err := installAll(m, lock, lockfile.LockFile{}); err != nil {
 		t.Fatal(err)
@@ -83,7 +95,7 @@ func TestInstallAllReplacesPreviousInstall(t *testing.T) {
 }
 
 func TestInstallAllAdoptsLegacyInstall(t *testing.T) {
-	repo := addonRepo(t)
+	dist := addonZip(t)
 	t.Chdir(t.TempDir())
 	m := manifest.NewManifest("test", "addons/odoopack", "19.0")
 	legacy := filepath.Join(m.AddonsPath, "new_addon", "legacy.py")
@@ -95,7 +107,7 @@ func TestInstallAllAdoptsLegacyInstall(t *testing.T) {
 	}
 
 	lock := lockfile.LockFile{Packages: map[string]lockfile.LockedPackage{
-		"new-addon": {Dist: lockfile.Dist{Type: "git", URL: repo}},
+		"new-addon": {Dist: dist},
 	}}
 	if err := installAll(m, lock, lockfile.LockFile{}); err != nil {
 		t.Fatal(err)
@@ -112,7 +124,7 @@ func TestInstallAllAdoptsLegacyInstall(t *testing.T) {
 }
 
 func TestInstallAllAdoptsLegacyInstallAfterResolvingAgain(t *testing.T) {
-	repo := addonRepo(t)
+	dist := addonZip(t)
 	t.Chdir(t.TempDir())
 	m := manifest.NewManifest("test", "addons/odoopack", "19.0")
 	dropped := filepath.Join(m.AddonsPath, "dropped_addon", "__init__.py")
@@ -124,10 +136,10 @@ func TestInstallAllAdoptsLegacyInstallAfterResolvingAgain(t *testing.T) {
 	}
 
 	previous := lockfile.LockFile{Packages: map[string]lockfile.LockedPackage{
-		"dropped-addon": {Dist: lockfile.Dist{Type: "git", URL: repo}},
+		"dropped-addon": {Dist: dist},
 	}}
 	lock := lockfile.LockFile{Packages: map[string]lockfile.LockedPackage{
-		"new-addon": {Dist: lockfile.Dist{Type: "git", URL: repo}},
+		"new-addon": {Dist: dist},
 	}}
 	if err := installAll(m, lock, previous); err != nil {
 		t.Fatal(err)

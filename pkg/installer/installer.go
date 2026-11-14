@@ -36,3 +36,12 @@ func addonDir(targetDir, addonName string) (string, error) {
 	}
 	return filepath.Join(targetDir, name.ModuleName(addonName)), nil
 }
+
+// checkIntegrity refuses a package the installer could not verify, such as a
+// zip locked by an odoopack that did not require a shasum yet.
+func checkIntegrity(addonName string, pkg lockfile.LockedPackage) error {
+	if err := pkg.Dist.CheckIntegrity(); err != nil {
+		return fmt.Errorf("%w; run \"odoopack update %s\" to lock it again", err, addonName)
+	}
+	return nil
+}

@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/spf13/viper"
+	"github.com/wimwenigerkind/odoopack-spec/digest"
 	"github.com/wimwenigerkind/odoopack-spec/name"
 	"github.com/wimwenigerkind/odoopack/pkg/helper"
 	"github.com/wimwenigerkind/odoopack/pkg/index"
@@ -150,18 +151,11 @@ func RecomputeHash(require map[string]string, indexes manifest.Indexes, odooSeri
 			}
 		}
 
-		packages[lookup.Name] = LockedPackage{
-			Version: lookup.Version,
-			Dist: Dist{
-				Type:      lookup.Type,
-				URL:       lookup.Repository,
-				Reference: lookup.Reference,
-				Shasum:    lookup.Shasum,
-			},
-			Direct:   item.direct,
-			Depends:  deps,
-			External: external,
+		locked, err := lockPackage(lookup, item.direct, deps, external)
+		if err != nil {
+			return LockFile{}, err
 		}
+		packages[lookup.Name] = locked
 	}
 
 	hash, err := ComputeHash(require, indexes, packages)
@@ -173,4 +167,61 @@ func RecomputeHash(require map[string]string, indexes manifest.Indexes, odooSeri
 		ContentHash: hash,
 		Packages:    packages,
 	}, nil
+}
+
+// lockPackage refuses a version whose content cannot be verified at install,
+// whatever index it came from.
+func lockPackage(lookup index.AddonVersion, direct bool, deps, external []string) (LockedPackage, error) {
+	pkg := LockedPackage{
+		Version: lookup.Version,
+		Dist: Dist{
+			Type:      lookup.Type,
+			URL:       lookup.Repository,
+			Reference: lookup.Reference,
+			Shasum:    lookup.Shasum,
+		},
+		Direct:   direct,
+		Depends:  deps,
+		External: external,
+	}
+	if err := pkg.Dist.CheckIntegrity(); err != nil {
+		return LockedPackage{}, fmt.Errorf("%s %s: %w", lookup.Name, lookup.Version, err)
+	}
+	return pkg, nil
+}
+
+// CheckIntegrity reports whether d pins its content: a zip by its sha256
+// shasum, a git package by a full commit id.
+func (d Dist) CheckIntegrity() error {
+	switch d.Type {
+	case "zip":
+		if d.Shasum == "" {
+			return fmt.Errorf("zip has no shasum to verify it against")
+		}
+		_, err := digest.Parse(d.Shasum)
+		return err
+	case "git":
+		if d.Reference == "" {
+			return fmt.Errorf("git has no reference to check out")
+		}
+		if !isCommit(d.Reference) {
+			return fmt.Errorf("git reference %q must be a full commit id, 40 or 64 lowercase hex characters", d.Reference)
+		}
+		return nil
+	}
+	return fmt.Errorf("type %q must be \"zip\" or \"git\"", d.Type)
+}
+
+// isCommit matches what the registry accepts as a reference: 40 hex
+// characters for sha1 repositories, 64 for sha256 ones.
+func isCommit(s string) bool {
+	if len(s) != 40 && len(s) != 64 {
+		return false
+	}
+	for _, c := range s {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return false
+		}
+	}
+	return true
 }

@@ -129,11 +129,30 @@ func TestZipInstallRejectsMalformedShasum(t *testing.T) {
 		pkg := lockfile.LockedPackage{Dist: lockfile.Dist{Type: "zip", URL: srv.URL, Shasum: malformed}}
 		target := filepath.Join(t.TempDir(), "addons")
 		err := NewZipInstaller(store.New(t.TempDir())).Install(target, "acme/health-check", pkg)
-		if err == nil || !strings.HasPrefix(err.Error(), "digest:") {
+		if err == nil || !strings.Contains(err.Error(), "digest:") {
 			t.Errorf("shasum %q: got error %v, want a digest error", malformed, err)
 		}
 		if _, err := os.Stat(target); !os.IsNotExist(err) {
 			t.Errorf("shasum %q: target was created: %v", malformed, err)
+		}
+	}
+	if n := downloads.Load(); n != 0 {
+		t.Fatalf("downloaded %d times, want 0", n)
+	}
+}
+
+// A lockfile written before odoopack required a shasum may lack one.
+func TestZipInstallRequiresShasum(t *testing.T) {
+	srv, _, downloads := serveAddonZip(t)
+	pkg := lockfile.LockedPackage{Dist: lockfile.Dist{Type: "zip", URL: srv.URL}}
+	for _, st := range []*store.Store{store.New(t.TempDir()), nil} {
+		target := filepath.Join(t.TempDir(), "addons")
+		err := NewZipInstaller(st).Install(target, "acme/health-check", pkg)
+		if err == nil || !strings.Contains(err.Error(), "has no shasum") || !strings.Contains(err.Error(), "odoopack update acme/health-check") {
+			t.Errorf("store %v: got error %v, want one about the missing shasum", st != nil, err)
+		}
+		if _, err := os.Stat(target); !os.IsNotExist(err) {
+			t.Errorf("store %v: target was created: %v", st != nil, err)
 		}
 	}
 	if n := downloads.Load(); n != 0 {
