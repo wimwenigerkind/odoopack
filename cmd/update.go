@@ -8,7 +8,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/wimwenigerkind/odoopack/pkg/addonsdir"
-	"github.com/wimwenigerkind/odoopack/pkg/index"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
 	"github.com/wimwenigerkind/odoopack/pkg/ui"
@@ -57,45 +56,30 @@ func updateAll(m *manifest.Manifest) {
 }
 
 func updateOne(m *manifest.Manifest, name string) {
-	version, ok := m.Require[name]
-	if !ok {
+	if _, ok := m.Require[name]; !ok {
 		fatal(fmt.Errorf("%s is not a required addon", name))
 	}
 
-	lock, err := lockfile.LoadOrNew()
+	previous, err := lockfile.LoadOrNew()
 	if err != nil {
 		fatal(err)
 	}
-
-	lookup, err := index.LookupLocked(m.Indexes, lock.Packages[name].Index, name, version, m.Odoo)
+	lock, err := lockfile.Update(m.Require, m.Indexes, m.Odoo, previous.Packages, name)
 	if err != nil {
 		fatal(err)
 	}
-	lock.Packages[lookup.Name] = lockfile.LockedPackage{
-		Version: lookup.Version,
-		Dist: lockfile.Dist{
-			Type:      lookup.Type,
-			URL:       lookup.Repository,
-			Reference: lookup.Reference,
-			Shasum:    lookup.Shasum,
-		},
-		Index: lookup.Index,
-	}
-	lock.ContentHash, err = lockfile.ComputeHash(m.Require, m.Indexes, m.Odoo, lock.Packages)
-	if err != nil {
+	if err := addonsdir.Claim(m.AddonsPath, lockedDirs(previous.Packages, lock.Packages)); err != nil {
 		fatal(err)
 	}
 	if err := lockfile.Save(lock); err != nil {
 		fatal(err)
 	}
 
-	if err := addonsdir.Claim(m.AddonsPath, lockedDirs(lock.Packages)); err != nil {
+	installed, removed, err := applyLock(m, previous, lock)
+	if err != nil {
 		fatal(err)
 	}
-	if err := installOne(m, lookup.Name, lock.Packages[lookup.Name]); err != nil {
-		fatal(err)
-	}
-	ui.Success("updated %s@%s", lookup.Name, lookup.Version)
+	ui.Success("updated %s@%s (%d package(s) installed, %d removed)", name, lock.Packages[name].Version, installed, removed)
 }
 
 func init() {

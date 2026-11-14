@@ -164,3 +164,221 @@ func TestLockfileWithoutIndexKeepsContentHash(t *testing.T) {
 		t.Fatalf("saving a loaded lockfile added the index field:\n%s", data)
 	}
 }
+
+func release(version string, depends ...string) registryapi.Version {
+	v := addon("acme/any", depends...).Versions[0]
+	v.Version = version
+	return v
+}
+
+// locked is a package locked to index a with the dist release serves.
+func locked(version string, direct bool, depends ...string) LockedPackage {
+	v := release(version)
+	return LockedPackage{
+		Version: version,
+		Dist:    Dist{Type: v.Type, URL: v.URL, Shasum: v.Shasum},
+		Direct:  direct,
+		Depends: depends,
+		Index:   "a",
+	}
+}
+
+func singleIndex(t *testing.T, addons ...registryapi.Addon) (manifest.Indexes, *atomic.Int32) {
+	t.Helper()
+	url, hits := registry(t, addons...)
+	viper.Set("default_index_url", "")
+	t.Cleanup(viper.Reset)
+	return manifest.Indexes{"a": {Url: url, Type: "registry"}}, hits
+}
+
+func TestUpdateResolvesTreeAndKeepsOthers(t *testing.T) {
+	indexes, _ := singleIndex(t,
+		registryapi.Addon{Name: "acme/health-check", Versions: []registryapi.Version{
+			release("19.0.1.0.0", "acme/old-dep"),
+			release("19.0.2.0.0", "acme/base-tools", "acme/shared"),
+		}},
+		registryapi.Addon{Name: "acme/base-tools", Versions: []registryapi.Version{release("19.0.1.0.0")}},
+		registryapi.Addon{Name: "acme/old-dep", Versions: []registryapi.Version{release("19.0.1.0.0")}},
+		registryapi.Addon{Name: "acme/shared", Versions: []registryapi.Version{release("19.0.1.0.0"), release("19.0.2.0.0")}},
+		registryapi.Addon{Name: "acme/other", Versions: []registryapi.Version{release("19.0.1.0.0", "acme/shared"), release("19.0.2.0.0", "acme/shared")}},
+	)
+	require := map[string]string{"acme/health-check": "19.0", "acme/other": "19.0"}
+	old := map[string]LockedPackage{
+		"acme/health-check": locked("19.0.1.0.0", true, "acme/old-dep"),
+		"acme/old-dep":      locked("19.0.1.0.0", false),
+		"acme/other":        locked("19.0.1.0.0", true, "acme/shared"),
+		"acme/shared":       locked("19.0.1.0.0", false),
+	}
+
+	lf, err := Update(require, indexes, "19.0", old, "acme/health-check")
+	if err != nil {
+		t.Fatal(err)
+	}
+	hc := lf.Packages["acme/health-check"]
+	if hc.Version != "19.0.2.0.0" || !hc.Direct || hc.Index != "a" || strings.Join(hc.Depends, ",") != "acme/base-tools,acme/shared" {
+		t.Errorf("acme/health-check locked as %+v", hc)
+	}
+	if bt, ok := lf.Packages["acme/base-tools"]; !ok || bt.Direct {
+		t.Errorf("new dependency acme/base-tools locked as %+v, %v", bt, ok)
+	}
+	if _, ok := lf.Packages["acme/old-dep"]; ok {
+		t.Error("acme/old-dep is still locked, but nothing needs it")
+	}
+	// acme/shared is in the tree of the updated addon, acme/other is not.
+	if got := lf.Packages["acme/shared"].Version; got != "19.0.2.0.0" {
+		t.Errorf("acme/shared locked at %s, want 19.0.2.0.0", got)
+	}
+	if got := lf.Packages["acme/other"]; got.Version != "19.0.1.0.0" || !got.Direct {
+		t.Errorf("acme/other locked as %+v, want it kept at 19.0.1.0.0", got)
+	}
+	if want, _ := ComputeHash(require, indexes, "19.0", lf.Packages); lf.ContentHash != want {
+		t.Error("content hash does not match the packages")
+	}
+}
+
+func TestRelockKeepsLockedAndDropsOrphans(t *testing.T) {
+	indexes, hits := singleIndex(t)
+	old := map[string]LockedPackage{
+		"acme/health-check": locked("19.0.1.0.0", true, "acme/base-tools", "acme/shared"),
+		"acme/base-tools":   locked("19.0.1.0.0", false),
+		"acme/other":        locked("19.0.1.0.0", true, "acme/shared"),
+		"acme/shared":       locked("19.0.1.0.0", false),
+	}
+
+	lf, err := Relock(map[string]string{"acme/other": "19.0"}, indexes, "19.0", old)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(lf.Packages) != 2 || lf.Packages["acme/other"].Version == "" || lf.Packages["acme/shared"].Version == "" {
+		t.Errorf("locked %v, want acme/other and acme/shared", lf.Packages)
+	}
+	if n := hits.Load(); n != 0 {
+		t.Errorf("relocking locked packages sent %d request(s)", n)
+	}
+}
+
+func TestRelockResolvesEntryWithoutDirect(t *testing.T) {
+	indexes, _ := singleIndex(t,
+		registryapi.Addon{Name: "acme/health-check", Versions: []registryapi.Version{release("19.0.1.0.0", "acme/base-tools")}},
+		registryapi.Addon{Name: "acme/base-tools", Versions: []registryapi.Version{release("19.0.1.0.0")}},
+	)
+	// An update before direct and depends were kept wrote entries like this.
+	old := map[string]LockedPackage{"acme/health-check": locked("19.0.1.0.0", false)}
+
+	lf, err := Relock(map[string]string{"acme/health-check": "19.0"}, indexes, "19.0", old)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hc := lf.Packages["acme/health-check"]; !hc.Direct || len(hc.Depends) != 1 {
+		t.Errorf("acme/health-check locked as %+v", hc)
+	}
+	if _, ok := lf.Packages["acme/base-tools"]; !ok {
+		t.Error("acme/base-tools is not locked")
+	}
+}
+
+func TestDirectVersionWinsOverDependency(t *testing.T) {
+	indexes, _ := singleIndex(t,
+		registryapi.Addon{Name: "acme/health-check", Versions: []registryapi.Version{release("19.0.1.0.0", "acme/base-tools")}},
+		registryapi.Addon{Name: "acme/base-tools", Versions: []registryapi.Version{release("19.0.1.0.0"), release("19.0.2.0.0")}},
+	)
+	require := map[string]string{"acme/health-check": "19.0", "acme/base-tools": "19.0.1.0.0"}
+
+	full, err := RecomputeHash(require, indexes, "19.0", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Update visits the tree of acme/health-check first, so the dependency
+	// reaches acme/base-tools before its own requirement does.
+	tree, err := Update(require, indexes, "19.0", nil, "acme/health-check")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, lf := range []LockFile{full, tree} {
+		if bt := lf.Packages["acme/base-tools"]; bt.Version != "19.0.1.0.0" || !bt.Direct {
+			t.Errorf("acme/base-tools locked as %+v, want the required 19.0.1.0.0", bt)
+		}
+	}
+}
+
+func TestConflictingRequirements(t *testing.T) {
+	indexes, _ := singleIndex(t,
+		registryapi.Addon{Name: "acme/health-check", Versions: []registryapi.Version{release("19.0.1.0.0", "acme/base-tools")}},
+		registryapi.Addon{Name: "acme/base-tools", Versions: []registryapi.Version{release("19.0.1.0.0"), release("19.0.2.0.0"), release("18.0.1.0.0")}},
+	)
+	tests := []struct {
+		name       string
+		constraint string
+		want       string
+	}{
+		{"two exact versions", "19.0.2.0.0", "conflicting requirements for acme/base-tools: the manifest requires 19.0.1.0.0 and resolved 19.0.1.0.0, but acme/other -> acme/health-check requires 19.0.2.0.0"},
+		{"another series", "18.0", "but acme/other -> acme/health-check requires 18.0"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			r := newResolver(map[string]string{"acme/base-tools": "19.0.1.0.0"}, indexes, "19.0", nil)
+			err := r.visit([]resolveItem{
+				{name: "acme/base-tools", req: requirement{constraint: "19.0.1.0.0"}},
+				{name: "acme/base-tools", req: requirement{constraint: tc.constraint, path: []string{"acme/other", "acme/health-check"}}},
+			})
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("got %v, want an error containing %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestSatisfies(t *testing.T) {
+	tests := []struct {
+		constraint, version string
+		want                bool
+	}{
+		{"19.0.1.0.0", "19.0.1.0.0", true},
+		{"19.0.1.0.0", "19.0.2.0.0", false},
+		{"19.0", "19.0.2.0.0", true},
+		{"19.0", "18.0.1.0.0", false},
+		{"19.0", "dev-19.0", true},
+		{"dev-19.0", "dev-19.0", true},
+		{"dev-19.0", "dev-main", false},
+		{"dev-19.0", "19.0.1.0.0", false},
+		{"19.0.1.0.0", "dev-19.0", false},
+	}
+	for _, tc := range tests {
+		if got := satisfies(tc.constraint, tc.version); got != tc.want {
+			t.Errorf("satisfies(%q, %q) = %v, want %v", tc.constraint, tc.version, got, tc.want)
+		}
+	}
+}
+
+func TestRelockKeepsPackageFromImplicitDefault(t *testing.T) {
+	indexes, hits := singleIndex(t)
+	public, publicHits := registry(t)
+	viper.Set("default_index_url", public)
+
+	fromDefault := locked("19.0.1.0.0", true)
+	fromDefault.Index = "default"
+	old := map[string]LockedPackage{"acme/public-tools": fromDefault}
+
+	lf, err := Relock(map[string]string{"acme/public-tools": "19.0"}, indexes, "19.0", old)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := lf.Packages["acme/public-tools"]; got.Index != "default" || got.Version != "19.0.1.0.0" {
+		t.Errorf("locked %+v, want the package kept from the default index", got)
+	}
+	if n := hits.Load() + publicHits.Load(); n != 0 {
+		t.Errorf("relocking a package from the default index sent %d request(s)", n)
+	}
+}
+
+func TestRelockRefusesModuleCollision(t *testing.T) {
+	indexes, _ := singleIndex(t)
+	old := map[string]LockedPackage{
+		"acme/health-check": locked("19.0.1.0.0", true),
+		"acme/health_check": locked("19.0.1.0.0", true),
+	}
+	_, err := Relock(map[string]string{"acme/health-check": "19.0", "acme/health_check": "19.0"}, indexes, "19.0", old)
+	if err == nil || !strings.Contains(err.Error(), "acme_health_check") {
+		t.Fatalf("got error %v, want one naming the shared addon directory", err)
+	}
+}

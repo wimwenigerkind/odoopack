@@ -17,7 +17,7 @@ odoopack update [addon]
 
 ## Arguments
 
-- `[addon]`: optional. When given, only that addon is re-resolved and reinstalled. It must already be present in `odoopack.json`.
+- `[addon]`: optional. When given, only that addon and the packages it depends on are re-resolved. It must already be present in `odoopack.json`.
 
 ## Flags
 
@@ -28,6 +28,6 @@ odoopack update [addon]
 ## Behavior
 
 - **Without an argument:** recomputes the whole lockfile from the current requirements and indexes, saves it, and reinstalls all addons.
-- **With an argument:** re-resolves that one addon, updates its entry and the content hash in `odoopack.lock`, and reinstalls only that addon.
+- **With an argument:** re-resolves that addon and its dependency tree; every other locked package keeps its locked version as long as it still satisfies its requirements. New dependencies are added to `odoopack.lock`, dependencies nothing needs any more are dropped, and the addon stays marked as `direct`. Then it installs every package whose locked version or distribution changed and deletes the directories of dropped packages.
 
 Since requirements are pinned to explicit versions, `update` picks up a change only when the version a requirement points to now resolves to a different distribution (for example a moved branch build), or when a requirement was edited in `odoopack.json`.

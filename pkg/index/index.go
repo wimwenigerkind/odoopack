@@ -99,6 +99,17 @@ func UsesImplicitDefault(indexes manifest.Indexes, defaultURL string) bool {
 	return true
 }
 
+// Searches reports whether name is one of the indexes LookupLocked searches,
+// the implicit default index included.
+func Searches(indexes manifest.Indexes, name string) bool {
+	for _, ni := range searchOrder(indexes) {
+		if ni.name == name {
+			return true
+		}
+	}
+	return false
+}
+
 // LookupLocked resolves an addon from lockedIndex only, when that index still
 // exists. Otherwise it tries the indexes of the manifest in alphabetical order
 // and the implicit default index last.

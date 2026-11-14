@@ -48,33 +48,26 @@ var requireCmd = &cobra.Command{
 		}
 
 		m.AddRequirement(lookup.Name, constraint)
-		if err := manifest.Save(*m); err != nil {
-			fatal(err)
-		}
-
 		lockFile, err := lockfile.RecomputeHash(m.Require, m.Indexes, m.Odoo, oldLock.Packages)
 		if err != nil {
+			fatal(err)
+		}
+		if err := addonsdir.Claim(m.AddonsPath, lockedDirs(oldLock.Packages, lockFile.Packages)); err != nil {
+			fatal(err)
+		}
+		if err := manifest.Save(*m); err != nil {
 			fatal(err)
 		}
 		if err := lockfile.Save(lockFile); err != nil {
 			fatal(err)
 		}
 
-		if err := addonsdir.Claim(m.AddonsPath, lockedDirs(oldLock.Packages)); err != nil {
+		installed, removed, err := applyLock(m, oldLock, lockFile)
+		if err != nil {
 			fatal(err)
 		}
-		added := 0
-		for name, pkg := range lockFile.Packages {
-			if _, existed := oldLock.Packages[name]; existed {
-				continue
-			}
-			if err := installOne(m, name, pkg); err != nil {
-				fatal(err)
-			}
-			added++
-		}
 
-		ui.Success("added %s@%s (%d package(s) installed)", lookup.Name, lookup.Version, added)
+		ui.Success("added %s@%s (%d package(s) installed, %d removed)", lookup.Name, lockFile.Packages[lookup.Name].Version, installed, removed)
 	},
 }
 

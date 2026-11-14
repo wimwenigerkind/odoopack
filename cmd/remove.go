@@ -5,10 +5,10 @@ package cmd
 
 import (
 	"fmt"
+	"maps"
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/wimwenigerkind/odoopack-spec/name"
 	"github.com/wimwenigerkind/odoopack/pkg/addonsdir"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
@@ -44,28 +44,33 @@ var removeCmd = &cobra.Command{
 		if err != nil {
 			fatal(err)
 		}
-		if err := addonsdir.RemoveAddon(m.AddonsPath, name.ModuleName(addonName), lockedDirs(lock.Packages)); err != nil {
+		remaining := maps.Clone(m.Require)
+		delete(remaining, addonName)
+		next, err := lockfile.Relock(remaining, m.Indexes, m.Odoo, lock.Packages)
+		if err != nil {
 			fatal(err)
 		}
+		if _, needed := next.Packages[addonName]; needed {
+			fatal(fmt.Errorf("cannot remove %s: %s depend(s) on it", addonName, strings.Join(lockfile.Dependents(next.Packages, addonName), ", ")))
+		}
 
+		if err := addonsdir.Claim(m.AddonsPath, lockedDirs(lock.Packages, next.Packages)); err != nil {
+			fatal(err)
+		}
 		m.RemoveRequirement(addonName)
 		if err := manifest.Save(*m); err != nil {
 			fatal(err)
 		}
+		if err := lockfile.Save(next); err != nil {
+			fatal(err)
+		}
 
-		delete(lock.Packages, addonName)
-
-		lock.ContentHash, err = lockfile.ComputeHash(m.Require, m.Indexes, m.Odoo, lock.Packages)
+		installed, removed, err := applyLock(m, lock, next)
 		if err != nil {
 			fatal(err)
 		}
 
-		err = lockfile.Save(lock)
-		if err != nil {
-			fatal(err)
-		}
-
-		ui.Success("removed %s@%s", addonName, version)
+		ui.Success("removed %s@%s (%d package(s) removed, %d installed)", addonName, version, removed, installed)
 	},
 }
 
