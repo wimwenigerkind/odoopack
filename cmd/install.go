@@ -9,8 +9,10 @@ import (
 	"sort"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"github.com/wimwenigerkind/odoopack-spec/name"
 	"github.com/wimwenigerkind/odoopack/pkg/addonsdir"
+	"github.com/wimwenigerkind/odoopack/pkg/helper"
 	"github.com/wimwenigerkind/odoopack/pkg/installer"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
@@ -40,11 +42,14 @@ var installCmd = &cobra.Command{
 		}
 		previous := lock
 
-		isStale, err := lockfile.IsStale(m.Require, m.Indexes, lock.Packages, lock.ContentHash)
+		isStale, err := lockfile.IsStale(m.Require, m.Indexes, m.Odoo, lock.Packages, lock.ContentHash)
 		if err != nil {
 			fatal(err)
 		}
 
+		if isStale && viper.GetBool("frozen_lockfile") {
+			fatal(frozenLockfileError())
+		}
 		if isStale {
 			ui.Info("lockfile is stale, resolving")
 			lock, err = lockfile.RecomputeHash(m.Require, m.Indexes, m.Odoo)
@@ -62,6 +67,19 @@ var installCmd = &cobra.Command{
 		}
 		ui.Success("installed %d package(s)", len(lock.Packages))
 	},
+}
+
+func frozenLockfileError() error {
+	const fix = "run 'odoopack install' without --frozen-lockfile (or 'odoopack update') and commit the lockfile"
+	path := viper.GetString("lock")
+	exists, err := helper.FileExists(path)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return fmt.Errorf("%s not found; %s", path, fix)
+	}
+	return fmt.Errorf("%s is out of date with %s; %s", path, viper.GetString("manifest"), fix)
 }
 
 // installAll replaces addons_path with the packages in lock. previous is the
@@ -124,5 +142,8 @@ func installOne(m *manifest.Manifest, name string, pkg lockfile.LockedPackage) e
 
 func init() {
 	addNoCacheFlag(installCmd)
+	// Only install has this flag, so unlike no_cache it can be bound up front.
+	installCmd.Flags().Bool("frozen-lockfile", false, "fail instead of resolving again when the lockfile is missing or stale")
+	_ = viper.BindPFlag("frozen_lockfile", installCmd.Flags().Lookup("frozen-lockfile"))
 	rootCmd.AddCommand(installCmd)
 }

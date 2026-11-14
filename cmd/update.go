@@ -80,7 +80,7 @@ func updateOne(m *manifest.Manifest, name string) {
 			Shasum:    lookup.Shasum,
 		},
 	}
-	lock.ContentHash, err = lockfile.ComputeHash(m.Require, m.Indexes, lock.Packages)
+	lock.ContentHash, err = lockfile.ComputeHash(m.Require, m.Indexes, m.Odoo, lock.Packages)
 	if err != nil {
 		fatal(err)
 	}

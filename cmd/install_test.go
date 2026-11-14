@@ -158,8 +158,9 @@ func TestInstallAllAdoptsLegacyInstallAfterResolvingAgain(t *testing.T) {
 // installInChild runs install in a child process of the test binary, since
 // install exits the process on an error. The calling test must start with
 // runInstallIfChild. It writes files into a temporary project directory and
-// fails the test if install succeeds or changes any of them.
-func installInChild(t *testing.T, files map[string]string) (dir, out string) {
+// fails the test if install succeeds or changes any of them. env is added to
+// the environment of the child.
+func installInChild(t *testing.T, files map[string]string, env ...string) (dir, out string) {
 	t.Helper()
 	dir = t.TempDir()
 	for name, content := range files {
@@ -174,7 +175,7 @@ func installInChild(t *testing.T, files map[string]string) (dir, out string) {
 
 	cmd := exec.Command(os.Args[0], "-test.run=^"+t.Name()+"$")
 	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "ODOOPACK_TEST_INSTALL=1")
+	cmd.Env = append(append(os.Environ(), "ODOOPACK_TEST_INSTALL=1"), env...)
 	output, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Fatalf("install succeeded:\n%s", output)
@@ -189,9 +190,12 @@ func installInChild(t *testing.T, files map[string]string) (dir, out string) {
 	return dir, string(output)
 }
 
-func runInstallIfChild() bool {
+func runInstallIfChild(args ...string) bool {
 	if os.Getenv("ODOOPACK_TEST_INSTALL") != "1" {
 		return false
+	}
+	if err := installCmd.ParseFlags(args); err != nil {
+		fatal(err)
 	}
 	installCmd.Run(installCmd, nil)
 	return true
@@ -231,5 +235,60 @@ func TestInstallRejectsNewerLockfileFormat(t *testing.T) {
 	})
 	if !strings.Contains(out, "odoopack.lock") || !strings.Contains(out, "upgrade odoopack") {
 		t.Fatalf("output does not name the lockfile and ask to upgrade:\n%s", out)
+	}
+}
+
+// unreachableManifest has one index that refuses connections, so that a test
+// which resolves again fails without reaching the network.
+const unreachableManifest = `{"name":"test","odoo":"19.0","require":{"acme/health-check":"19.0"},"indexes":{"default":{"url":"http://127.0.0.1:1","type":"registry"}},"addons_path":"addons/odoopack"}`
+
+// staleLockfile locks acme/health-check, but its content hash matches nothing.
+const staleLockfile = `{"format":1,"content_hash":"sha256:00","packages":{"acme/health-check":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/x.git"},"direct":true}}}`
+
+func TestInstallResolvesStaleLockfile(t *testing.T) {
+	if runInstallIfChild() {
+		return
+	}
+
+	_, out := installInChild(t, map[string]string{
+		"odoopack.json": unreachableManifest,
+		"odoopack.lock": staleLockfile,
+	}, "ODOOPACK_FROZEN_LOCKFILE=0")
+	if !strings.Contains(out, "lockfile is stale, resolving") || !strings.Contains(out, "127.0.0.1:1") {
+		t.Fatalf("install did not resolve again:\n%s", out)
+	}
+}
+
+func TestInstallFrozenRefusesStaleLockfile(t *testing.T) {
+	if runInstallIfChild("--frozen-lockfile") {
+		return
+	}
+
+	_, out := installInChild(t, map[string]string{
+		"odoopack.json": unreachableManifest,
+		"odoopack.lock": staleLockfile,
+		filepath.Join("addons", "odoopack", addonsdir.MarkerName):                   "",
+		filepath.Join("addons", "odoopack", "acme_health_check", "__manifest__.py"): "{}",
+	})
+	if strings.Contains(out, "resolving") || !strings.Contains(out, "odoopack.lock is out of date") || !strings.Contains(out, "without --frozen-lockfile") {
+		t.Fatalf("output does not refuse the stale lockfile and say how to fix it:\n%s", out)
+	}
+}
+
+func TestInstallFrozenRefusesMissingLockfile(t *testing.T) {
+	if runInstallIfChild() {
+		return
+	}
+
+	dir, out := installInChild(t, map[string]string{
+		"odoopack.json": unreachableManifest,
+	}, "ODOOPACK_FROZEN_LOCKFILE=1")
+	if strings.Contains(out, "resolving") || !strings.Contains(out, "odoopack.lock not found") || !strings.Contains(out, "commit the lockfile") {
+		t.Fatalf("output does not refuse the missing lockfile and say how to fix it:\n%s", out)
+	}
+	for _, name := range []string{"odoopack.lock", "addons"} {
+		if _, err := os.Stat(filepath.Join(dir, name)); !os.IsNotExist(err) {
+			t.Errorf("%s was created: %v", name, err)
+		}
 	}
 }

@@ -27,7 +27,7 @@ The lockfile pins the exact distribution of every requirement so that installs a
 | Field | Type | Description |
 | --- | --- | --- |
 | `format` | integer | Version of the lockfile format, currently `1`. A lockfile without it is format 1. odoopack refuses a lockfile with a higher format than it knows and asks you to upgrade odoopack; it always writes the current format. Not part of `content_hash`, so a lockfile does not become stale when it gains the field. |
-| `content_hash` | string | `sha256:` hash of the requirements, indexes, and locked packages. Used to detect when the lockfile is stale relative to the manifest. |
+| `content_hash` | string | `sha256:` hash of the requirements, indexes, `odoo` series, and locked packages. Used to detect when the lockfile is stale relative to the manifest. |
 | `packages` | object | Map of addon name to the locked package. |
 
 ### `packages.<name>`
@@ -42,4 +42,4 @@ The lockfile pins the exact distribution of every requirement so that installs a
 
 ## Staleness
 
-When you change `require` or `indexes` in the manifest, the lockfile's `content_hash` no longer matches. [`install`](../commands/install.md) detects this, re-resolves against the registry, and rewrites the lockfile before installing. [`update`](../commands/update.md) always re-resolves.
+When you change `require`, `indexes` or `odoo` in the manifest, the lockfile's `content_hash` no longer matches. [`install`](../commands/install.md) detects this, re-resolves against the registry, and rewrites the lockfile before installing, or fails with `--frozen-lockfile`. [`update`](../commands/update.md) always re-resolves.

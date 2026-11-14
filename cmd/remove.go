@@ -55,7 +55,7 @@ var removeCmd = &cobra.Command{
 
 		delete(lock.Packages, addonName)
 
-		lock.ContentHash, err = lockfile.ComputeHash(m.Require, m.Indexes, lock.Packages)
+		lock.ContentHash, err = lockfile.ComputeHash(m.Require, m.Indexes, m.Odoo, lock.Packages)
 		if err != nil {
 			fatal(err)
 		}

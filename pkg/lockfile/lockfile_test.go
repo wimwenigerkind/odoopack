@@ -2,6 +2,8 @@ package lockfile
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -95,7 +97,7 @@ func TestFormatKeepsContentHash(t *testing.T) {
 	packages := map[string]LockedPackage{
 		"acme/health-check": {Version: "19.0.1.0.0", Dist: Dist{Type: "git", URL: "https://example.com/x.git"}, Direct: true},
 	}
-	hash, err := ComputeHash(require, indexes, packages)
+	hash, err := ComputeHash(require, indexes, "19.0", packages)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +115,7 @@ func TestFormatKeepsContentHash(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := ComputeHash(require, indexes, saved.Packages)
+	got, err := ComputeHash(require, indexes, "19.0", saved.Packages)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,5 +161,57 @@ func TestLockPackageRequiresIntegrity(t *testing.T) {
 				t.Fatalf("got error %v, want one naming the package and containing %q", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestChangedSeriesMakesLockfileStale(t *testing.T) {
+	require := map[string]string{"acme/health-check": "19.0"}
+	packages := map[string]LockedPackage{
+		"acme/health-check": {Version: "19.0.1.0.0", Dist: Dist{Type: "git", URL: "https://example.com/x.git"}, Direct: true},
+	}
+
+	for _, from := range []string{"19.0", ""} {
+		hash, err := ComputeHash(require, nil, from, packages)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if stale, err := IsStale(require, nil, from, packages, hash); err != nil || stale {
+			t.Fatalf("series %q: lockfile is stale (%v) without a change", from, err)
+		}
+		if stale, err := IsStale(require, nil, "18.0", packages, hash); err != nil || !stale {
+			t.Fatalf("series %q: lockfile is not stale (%v) after changing the series to 18.0", from, err)
+		}
+	}
+}
+
+func previousHash(t *testing.T, require map[string]string, indexes manifest.Indexes, packages map[string]LockedPackage) string {
+	t.Helper()
+	payload := struct {
+		Require  map[string]string        `json:"require"`
+		Indexes  manifest.Indexes         `json:"indexes"`
+		Packages map[string]LockedPackage `json:"packages"`
+	}{Require: require, Indexes: indexes, Packages: packages}
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return fmt.Sprintf("sha256:%x", sha256.Sum256(data))
+}
+
+func TestPreviousHashIsNotStale(t *testing.T) {
+	require := map[string]string{"acme/health-check": "19.0"}
+	indexes := manifest.Indexes{"company": {Url: "https://registry.example.com", Type: "registry"}}
+	packages := map[string]LockedPackage{
+		"acme/health-check": {Version: "19.0.1.0.0", Dist: Dist{Type: "git", URL: "https://example.com/x.git"}, Direct: true},
+	}
+	hash := previousHash(t, require, indexes, packages)
+
+	if stale, err := IsStale(require, indexes, "19.0", packages, hash); err != nil || stale {
+		t.Fatalf("lockfile from the previous odoopack is stale (%v)", err)
+	}
+	changed := map[string]string{"acme/health-check": "19.0.2"}
+	if stale, err := IsStale(changed, indexes, "19.0", packages, hash); err != nil || !stale {
+		t.Fatalf("lockfile from the previous odoopack is not stale (%v) after changing require", err)
 	}
 }

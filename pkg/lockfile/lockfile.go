@@ -79,13 +79,28 @@ func Save(lockFile LockFile) error {
 	return os.WriteFile(viper.GetString("lock"), data, 0644)
 }
 
-func ComputeHash(require map[string]string, indexes manifest.Indexes, packages map[string]LockedPackage) (string, error) {
-	payload := struct {
+// ComputeHash covers everything the packages were resolved from, so that a
+// change to any of it makes the lockfile stale.
+func ComputeHash(require map[string]string, indexes manifest.Indexes, odoo string, packages map[string]LockedPackage) (string, error) {
+	return hashJSON(struct {
+		Require  map[string]string        `json:"require"`
+		Indexes  manifest.Indexes         `json:"indexes"`
+		Odoo     string                   `json:"odoo"`
+		Packages map[string]LockedPackage `json:"packages"`
+	}{Require: require, Indexes: indexes, Odoo: odoo, Packages: packages})
+}
+
+// legacyHash is content_hash as odoopack computed it before the series was
+// part of it.
+func legacyHash(require map[string]string, indexes manifest.Indexes, packages map[string]LockedPackage) (string, error) {
+	return hashJSON(struct {
 		Require  map[string]string        `json:"require"`
 		Indexes  manifest.Indexes         `json:"indexes"`
 		Packages map[string]LockedPackage `json:"packages"`
-	}{Require: require, Indexes: indexes, Packages: packages}
+	}{Require: require, Indexes: indexes, Packages: packages})
+}
 
+func hashJSON(payload any) (string, error) {
 	data, err := json.Marshal(payload)
 	if err != nil {
 		return "", err
@@ -95,12 +110,24 @@ func ComputeHash(require map[string]string, indexes manifest.Indexes, packages m
 	return fmt.Sprintf("sha256:%x", hash), nil
 }
 
-func IsStale(require map[string]string, indexes manifest.Indexes, packages map[string]LockedPackage, hash string) (bool, error) {
-	computedHash, err := ComputeHash(require, indexes, packages)
+func IsStale(require map[string]string, indexes manifest.Indexes, odoo string, packages map[string]LockedPackage, hash string) (bool, error) {
+	computedHash, err := ComputeHash(require, indexes, odoo, packages)
 	if err != nil {
 		return false, err
 	}
-	return computedHash != hash, nil
+	if computedHash == hash {
+		return false, nil
+	}
+
+	// A lockfile hashed before the series was part of content_hash is still
+	// fresh, so that upgrading odoopack does not make install --frozen-lockfile
+	// fail in every project. Its series cannot be checked until the lockfile is
+	// written again, which then adds it to the hash.
+	legacy, err := legacyHash(require, indexes, packages)
+	if err != nil {
+		return false, err
+	}
+	return legacy != hash, nil
 }
 
 type resolveItem struct {
@@ -158,7 +185,7 @@ func RecomputeHash(require map[string]string, indexes manifest.Indexes, odooSeri
 		packages[lookup.Name] = locked
 	}
 
-	hash, err := ComputeHash(require, indexes, packages)
+	hash, err := ComputeHash(require, indexes, odooSeries, packages)
 	if err != nil {
 		return LockFile{}, err
 	}

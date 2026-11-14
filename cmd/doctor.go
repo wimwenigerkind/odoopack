@@ -84,7 +84,7 @@ var doctorCmd = &cobra.Command{
 
 		if lf, err := lockfile.Load(); err != nil {
 			warn("no lockfile found (run 'odoopack install')")
-		} else if stale, err := lockfile.IsStale(m.Require, m.Indexes, lf.Packages, lf.ContentHash); err == nil && stale {
+		} else if stale, err := lockfile.IsStale(m.Require, m.Indexes, m.Odoo, lf.Packages, lf.ContentHash); err == nil && stale {
 			warn("lockfile is out of date (run 'odoopack install')")
 		} else {
 			ok("lockfile up to date (%d package(s))", len(lf.Packages))

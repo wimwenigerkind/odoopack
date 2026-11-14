@@ -13,7 +13,7 @@ jobs:
       - uses: wimwenigerkind/setup-odoopack@v0.1.0
         with:
           version: latest
-      - run: odoopack install
+      - run: odoopack install --frozen-lockfile
 ```
 
 ## Private registry
@@ -31,7 +31,7 @@ jobs:
           version: latest
           registry-url: https://registry.example.com
           token: ${{ secrets.ODOOPACK_TOKEN }}
-      - run: odoopack install
+      - run: odoopack install --frozen-lockfile
 ```
 
 ## Caching packages
@@ -44,7 +44,7 @@ jobs:
           path: ~/.cache/odoopack
           key: odoopack-${{ runner.os }}-${{ hashFiles('odoopack.lock') }}
           restore-keys: odoopack-${{ runner.os }}-
-      - run: odoopack install
+      - run: odoopack install --frozen-lockfile
       - run: odoopack cache prune
 ```
 
@@ -60,4 +60,4 @@ Installed addon files are read-only, because they are hard linked to the store. 
 | `token` | `''` | API token for a private registry. Requires `registry-url`. |
 | `registry-url` | `''` | Base URL the token authenticates against. |
 
-Commit `odoopack.json` and `odoopack.lock` so that `odoopack install` in CI reproduces the exact locked versions.
+Commit `odoopack.json` and `odoopack.lock` so that `odoopack install` in CI reproduces the exact locked versions. `--frozen-lockfile` makes the job fail when the lockfile is missing or does not match the manifest, instead of resolving again on the runner; run `odoopack install` locally and commit the lockfile to fix it. Setting `ODOOPACK_FROZEN_LOCKFILE=1` in the job's `env` does the same for every step.

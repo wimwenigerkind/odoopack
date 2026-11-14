@@ -56,6 +56,7 @@ func init() {
 	_ = viper.BindEnv("auth", "ODOOPACK_AUTH")
 	_ = viper.BindEnv("cache_dir", "ODOOPACK_CACHE_DIR")
 	_ = viper.BindEnv("no_cache", "ODOOPACK_NO_CACHE")
+	_ = viper.BindEnv("frozen_lockfile", "ODOOPACK_FROZEN_LOCKFILE")
 }
 
 func initConfig() {
