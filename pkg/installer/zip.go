@@ -61,7 +61,7 @@ func (i *ZipInstaller) Install(targetDir string, addonName string, pkg lockfile.
 	if err := os.RemoveAll(dest); err != nil {
 		return err
 	}
-	return store.Link(entry, dest)
+	return i.store.Link(entry, dest)
 }
 
 // extractZip downloads the zipball at url, verifies it against want unless

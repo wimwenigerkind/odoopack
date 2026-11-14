@@ -49,4 +49,4 @@ A package counts as used while a project still links to its files, so a package 
 | --- | --- | --- |
 | `--all` | `false` | Remove every package, including those still in use. Projects keep their files; the next install downloads the packages again. |
 
-Do not run `prune` while an install is running: it may remove a package the install is about to link, and the install then fails. Running it again fixes that.
+`prune` and installs coordinate through a lock file, `.lock` in the store directory. An install holds it shared from looking up a package until it is linked into the project, so installs run side by side; `prune` holds it exclusively. `prune` waits until running installs have linked their packages, and an install that starts during `prune` waits until `prune` is done. Nothing fails because the two overlap.

@@ -20,6 +20,24 @@ func fillAddon(dst string) error {
 	return os.WriteFile(filepath.Join(dst, "models", "a.py"), []byte("a"), 0644)
 }
 
+// ensureLinked returns the entry for digest after linking it into a project
+// that is removed again, so the entry exists but is unused.
+func ensureLinked(t *testing.T, st *Store, digest string, fill func(string) error) string {
+	t.Helper()
+	entry, err := st.Ensure(digest, fill)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project := filepath.Join(t.TempDir(), "addon")
+	if err := st.Link(entry, project); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(project); err != nil {
+		t.Fatal(err)
+	}
+	return entry
+}
+
 func TestEnsureFillsOnce(t *testing.T) {
 	st := New(t.TempDir())
 	calls := 0
@@ -28,14 +46,8 @@ func TestEnsureFillsOnce(t *testing.T) {
 		return fillAddon(dst)
 	}
 
-	first, err := st.Ensure(digest, fill)
-	if err != nil {
-		t.Fatal(err)
-	}
-	second, err := st.Ensure(digest, fill)
-	if err != nil {
-		t.Fatal(err)
-	}
+	first := ensureLinked(t, st, digest, fill)
+	second := ensureLinked(t, st, digest, fill)
 	if first != second || calls != 1 {
 		t.Fatalf("got entries %q and %q after %d fills, want one entry from one fill", first, second, calls)
 	}
@@ -66,8 +78,8 @@ func TestEnsureKeepsNothingOnFailure(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(entries) != 0 {
-		t.Fatalf("store keeps %d entries after a failed fill", len(entries))
+	if len(entries) != 1 || entries[0].Name() != lockName {
+		t.Fatalf("store keeps %v after a failed fill, want only the lock file", entries)
 	}
 }
 
@@ -88,7 +100,7 @@ func TestLinkSharesFiles(t *testing.T) {
 	}
 
 	dest := filepath.Join(t.TempDir(), "addon")
-	if err := Link(entry, dest); err != nil {
+	if err := st.Link(entry, dest); err != nil {
 		t.Fatal(err)
 	}
 
@@ -140,11 +152,8 @@ func TestPruneKeepsLinkedEntries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	unused, err := st.Ensure(strings.Repeat("f", 64), fillAddon)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := Link(used, filepath.Join(t.TempDir(), "addon")); err != nil {
+	unused := ensureLinked(t, st, strings.Repeat("f", 64), fillAddon)
+	if err := st.Link(used, filepath.Join(t.TempDir(), "addon")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -170,7 +179,7 @@ func TestPruneAllRemovesLinkedEntries(t *testing.T) {
 		t.Fatal(err)
 	}
 	project := filepath.Join(t.TempDir(), "addon")
-	if err := Link(entry, project); err != nil {
+	if err := st.Link(entry, project); err != nil {
 		t.Fatal(err)
 	}
 

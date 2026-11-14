@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spf13/viper"
@@ -20,7 +21,18 @@ var digestPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 // archive, and links it into each project that installs it.
 type Store struct {
 	dir string
+
+	// Ensure takes a shared hold on the lock file and Link gives it back.
+	// Concurrent installs through one Store share a single lock.
+	mu    sync.Mutex
+	holds int
+	lock  *os.File
 }
+
+// Installs lock the file shared and prune exclusively, so prune cannot remove
+// an entry between an install's Ensure and its Link, and installs do not
+// block each other.
+const lockName = ".lock"
 
 func New(dir string) *Store {
 	return &Store{dir: dir}
@@ -62,23 +74,35 @@ func CacheDir() (string, error) {
 
 // Ensure returns the entry for digest, calling fill to create it when it is
 // missing. fill receives a path that does not exist yet and must create it.
-func (s *Store) Ensure(digest string, fill func(dst string) error) (string, error) {
+//
+// A successful Ensure keeps prune away from the store until Link has linked
+// the entry, so it must be followed by Link.
+func (s *Store) Ensure(digest string, fill func(dst string) error) (entry string, err error) {
 	// The digest comes from the lockfile and becomes a path, so it must not
 	// be able to point outside the store.
 	if !digestPattern.MatchString(digest) {
 		return "", fmt.Errorf("invalid store digest %q", digest)
 	}
 
-	entry := filepath.Join(s.dir, digest)
+	if err := os.MkdirAll(s.dir, 0755); err != nil {
+		return "", err
+	}
+	if err := s.hold(); err != nil {
+		return "", err
+	}
+	defer func() {
+		if err != nil {
+			s.release()
+		}
+	}()
+
+	entry = filepath.Join(s.dir, digest)
 	if _, err := os.Stat(entry); err == nil {
 		return entry, nil
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return "", err
 	}
 
-	if err := os.MkdirAll(s.dir, 0755); err != nil {
-		return "", err
-	}
 	tmp, err := os.MkdirTemp(s.dir, ".tmp-*")
 	if err != nil {
 		return "", err
@@ -114,13 +138,24 @@ const staleStagingAge = time.Hour
 
 // Prune removes every entry no project links to any more, or every entry at
 // all. An entry is in use while one of its files has a second hard link, so
-// the store needs no record of the projects that use it.
+// the store needs no record of the projects that use it. Prune waits for
+// running installs to link their entries, and installs wait for Prune.
 func (s *Store) Prune(all bool) (PruneResult, error) {
 	var res PruneResult
-	entries, err := os.ReadDir(s.dir)
-	if errors.Is(err, fs.ErrNotExist) {
+	if _, err := os.Stat(s.dir); errors.Is(err, fs.ErrNotExist) {
 		return res, nil
 	}
+	lock, err := openLock(s.dir)
+	if err != nil {
+		return res, err
+	}
+	defer func() { _ = lock.Close() }()
+	if err := lockFile(lock, true); err != nil {
+		return res, err
+	}
+	defer func() { _ = unlockFile(lock) }()
+
+	entries, err := os.ReadDir(s.dir)
 	if err != nil {
 		return res, err
 	}
@@ -199,10 +234,15 @@ func makeReadOnly(root string) error {
 	})
 }
 
-// Link recreates src at dst with every file hard linked to the store. A file
-// that cannot be linked, for example because dst is on another volume, is
-// copied instead.
-func Link(src, dst string) error {
+// Link recreates the entry Ensure returned at dst with every file hard linked
+// to the store, and ends the hold Ensure took. A file that cannot be linked,
+// for example because dst is on another volume, is copied instead.
+func (s *Store) Link(entry, dst string) error {
+	defer s.release()
+	return link(entry, dst)
+}
+
+func link(src, dst string) error {
 	return filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -244,4 +284,37 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	return out.Close()
+}
+
+func openLock(dir string) (*os.File, error) {
+	return os.OpenFile(filepath.Join(dir, lockName), os.O_RDWR|os.O_CREATE, 0644)
+}
+
+func (s *Store) hold() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.holds == 0 {
+		lock, err := openLock(s.dir)
+		if err != nil {
+			return err
+		}
+		if err := lockFile(lock, false); err != nil {
+			_ = lock.Close()
+			return err
+		}
+		s.lock = lock
+	}
+	s.holds++
+	return nil
+}
+
+func (s *Store) release() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.holds--
+	if s.holds == 0 {
+		_ = unlockFile(s.lock)
+		_ = s.lock.Close()
+		s.lock = nil
+	}
 }

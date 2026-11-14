@@ -112,8 +112,9 @@ func TestZipInstallRejectsShasumMismatch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(entries) != 0 {
-		t.Fatalf("store keeps %d entries after a mismatch", len(entries))
+	// The store's lock file stays; nothing else may.
+	if len(entries) != 1 || entries[0].Name() != ".lock" {
+		t.Fatalf("store keeps %v after a mismatch, want only the lock file", entries)
 	}
 }
 
