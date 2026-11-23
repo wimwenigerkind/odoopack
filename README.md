@@ -30,6 +30,15 @@ $ docker run --rm -v "$PWD:/work" -w /work ghcr.io/wimwenigerkind/odoopack:lates
 
 Download the archive for your platform from the [releases](https://github.com/wimwenigerkind/odoopack/releases), extract the `odoopack` binary, and place it on your `PATH`.
 
+### Verify a release
+
+Every release archive, its checksums file and the Docker image carry a build provenance attestation signed by the release workflow. Verify them with the [GitHub CLI](https://cli.github.com/):
+
+```console
+$ gh attestation verify odoopack_Linux_x86_64.tar.gz --repo wimwenigerkind/odoopack
+$ gh attestation verify oci://ghcr.io/wimwenigerkind/odoopack:latest --repo wimwenigerkind/odoopack
+```
+
 ## Quickstart
 
 ```console

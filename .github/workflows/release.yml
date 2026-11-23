@@ -5,13 +5,17 @@ on:
     tags:
       - '*'
 
-permissions:
-  contents: write
-  packages: write
+permissions: {}
 
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      # Sign attestations with a Sigstore certificate bound to this workflow and store them.
+      id-token: write
+      attestations: write
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -49,3 +53,18 @@ jobs:
           # Your GoReleaser Pro key, if you are using the 'goreleaser-pro' distribution
           # GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+      - name: Attest archives and checksums
+        uses: actions/attest@v4
+        with:
+          subject-path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/*_checksums.txt
+
+      # GoReleaser writes dist/digests.txt after pushing: one line per image tag, the
+      # multi-platform manifest digest followed by the image reference.
+      - name: Attest Docker images
+        uses: actions/attest@v4
+        with:
+          subject-checksums: dist/digests.txt
