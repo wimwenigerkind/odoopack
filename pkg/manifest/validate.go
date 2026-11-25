@@ -17,7 +17,8 @@ import (
 var IndexTypes = []string{"registry"}
 
 var (
-	seriesPattern    = regexp.MustCompile(`^[0-9]+\.[0-9]+$`)
+	// seriesPattern spells a series like a version does: no leading zeros.
+	seriesPattern    = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
 	indexNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,63}$`)
 )
 
