@@ -53,7 +53,7 @@ Indexes are tried in their order during resolution, and only an index that does 
 
 ## Validation
 
-Every command checks the whole manifest when it loads it and stops with every problem it finds, before it resolves or installs anything. A command also refuses to write a manifest that would not pass, so a mistake in its arguments never leaves an invalid manifest behind. `odoopack doctor` additionally checks what depends on the project directory and the lockfile.
+Every command checks the whole manifest when it loads it and stops with every problem it finds, before it resolves or installs anything. Keys are matched exactly, so `"Require"` is an unknown key, not `require`. A key that appears twice in one object is an error, instead of the last one silently winning. A command also refuses to write a manifest that would not pass, so a mistake in its arguments never leaves an invalid manifest behind. `odoopack doctor` additionally checks what depends on the project directory and the lockfile.
 
 ## Unknown keys
 

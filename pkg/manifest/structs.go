@@ -1,9 +1,8 @@
 package manifest
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"sort"
 )
 
@@ -17,7 +16,7 @@ type Index struct {
 	Type string `json:"type"`
 	// Unknown holds the keys of the index this odoopack does not know, so
 	// that Save writes back what a newer odoopack added.
-	Unknown map[string]json.RawMessage `json:"-"`
+	Unknown map[string]jsontext.Value `json:",embed"`
 }
 
 // Indexes are searched in their order: the first index that has an addon
@@ -64,64 +63,6 @@ func (ix Indexes) Remove(name string) (Indexes, bool) {
 	return append(ix[:i:i], ix[i+1:]...), true
 }
 
-// UnmarshalJSON reads the array and, from releases before it, the object of
-// indexes by name, which those releases searched in alphabetical order.
-func (ix *Indexes) UnmarshalJSON(data []byte) error {
-	if isObject(data) {
-		var byName map[string]Index
-		if err := json.Unmarshal(data, &byName); err != nil {
-			return err
-		}
-		names := make([]string, 0, len(byName))
-		for name := range byName {
-			names = append(names, name)
-		}
-		sort.Strings(names)
-		*ix = make(Indexes, 0, len(names))
-		for _, name := range names {
-			idx := byName[name]
-			idx.Name = name
-			*ix = append(*ix, idx)
-		}
-		return nil
-	}
-
-	var list []Index
-	if err := json.Unmarshal(data, &list); err != nil {
-		return err
-	}
-	seen := make(map[string]bool, len(list))
-	for _, idx := range list {
-		if idx.Name == "" {
-			return fmt.Errorf("indexes: every index needs a name")
-		}
-		if seen[idx.Name] {
-			return fmt.Errorf("indexes: the name %q is used twice", idx.Name)
-		}
-		seen[idx.Name] = true
-	}
-	*ix = list
-	return nil
-}
-
-func (i *Index) UnmarshalJSON(data []byte) error {
-	type plain Index
-	if err := json.Unmarshal(data, (*plain)(i)); err != nil {
-		return err
-	}
-	unknown, err := unknownKeys(data, "name", "url", "type")
-	if err != nil {
-		return err
-	}
-	i.Unknown = unknown
-	return nil
-}
-
-func (i Index) MarshalJSON() ([]byte, error) {
-	type plain Index
-	return withUnknown(plain(i), i.Unknown)
-}
-
 // FormatVersion is the manifest format this odoopack writes. Raise it only
 // when an older odoopack would misread the new one; adding an optional field
 // does not need it.
@@ -130,7 +71,7 @@ const FormatVersion = 1
 type Manifest struct {
 	// Schema is the URL of a JSON Schema for editors. odoopack does not read
 	// it.
-	Schema string `json:"$schema,omitempty"`
+	Schema string `json:"$schema,omitzero"`
 	// FormatVersion stays out of content_hash, so that a lockfile does not
 	// become stale when its manifest gains the field.
 	FormatVersion int          `json:"format_version"`
@@ -141,24 +82,29 @@ type Manifest struct {
 	AddonsDir     string       `json:"addons_dir"`
 	// Extra is a free-form object for data of other tools, which odoopack
 	// keeps as it is and never warns about.
-	Extra json.RawMessage `json:"extra,omitempty"`
+	Extra jsontext.Value `json:"extra,omitzero"`
 	// Unknown holds the top-level keys this odoopack does not know, so that
 	// Save writes back what a newer odoopack added.
-	Unknown map[string]json.RawMessage `json:"-"`
+	Unknown map[string]jsontext.Value `json:",embed"`
 	// legacyIndexes is set when indexes were missing or an object, written
 	// by a release that searched the default registry implicitly.
 	legacyIndexes bool
 }
 
-// UnmarshalJSON also reads odoo and addons_path, which releases before
-// odoo_series and addons_dir wrote. Save writes the new keys only, so the old
-// ones go away with the next write.
+// UnmarshalJSON also reads what releases before format version 1 was frozen
+// wrote: odoo and addons_path, which are now odoo_series and addons_dir, and
+// indexes as an object by name, which those releases searched in
+// alphabetical order. Save writes the current form only, so the old one goes
+// away with the next write.
 func (m *Manifest) UnmarshalJSON(data []byte) error {
 	type plain Manifest
 	var v struct {
 		plain
-		Odoo       string `json:"odoo"`
-		AddonsPath string `json:"addons_path"`
+		// Indexes is shallower than plain.Indexes and takes its key, so that
+		// either form can be told apart before it is decoded.
+		Indexes    jsontext.Value `json:"indexes"`
+		Odoo       string         `json:"odoo"`
+		AddonsPath string         `json:"addons_path"`
 	}
 	if err := json.Unmarshal(data, &v); err != nil {
 		return err
@@ -170,26 +116,28 @@ func (m *Manifest) UnmarshalJSON(data []byte) error {
 	if m.AddonsDir == "" {
 		m.AddonsDir = v.AddonsPath
 	}
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
-	}
-	indexes, ok := raw["indexes"]
-	m.legacyIndexes = !ok || isObject(indexes)
-	if len(m.Extra) > 0 && !isObject(m.Extra) {
-		return fmt.Errorf("extra must be an object")
-	}
-	unknown, err := unknownKeys(data, "$schema", "format_version", "name", "odoo_series", "require", "indexes", "addons_dir", "extra", "odoo", "addons_path")
-	if err != nil {
-		return err
-	}
-	m.Unknown = unknown
-	return nil
-}
 
-func (m Manifest) MarshalJSON() ([]byte, error) {
-	type plain Manifest
-	return withUnknown(plain(m), m.Unknown)
+	switch v.Indexes.Kind() {
+	case '[':
+		return json.Unmarshal(v.Indexes, &m.Indexes)
+	case '{':
+		var byName map[string]Index
+		if err := json.Unmarshal(v.Indexes, &byName); err != nil {
+			return err
+		}
+		names := make([]string, 0, len(byName))
+		for name := range byName {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			idx := byName[name]
+			idx.Name = name
+			m.Indexes = append(m.Indexes, idx)
+		}
+	}
+	m.legacyIndexes = true
+	return nil
 }
 
 // UnknownKeys lists the keys of m this odoopack does not know, the keys of
@@ -206,56 +154,6 @@ func (m Manifest) UnknownKeys() []string {
 	}
 	sort.Strings(keys)
 	return keys
-}
-
-// unknownKeys returns the keys of the JSON object data that are not known,
-// or nil when there are none.
-func unknownKeys(data []byte, known ...string) (map[string]json.RawMessage, error) {
-	var all map[string]json.RawMessage
-	if err := json.Unmarshal(data, &all); err != nil {
-		return nil, err
-	}
-	for _, key := range known {
-		delete(all, key)
-	}
-	if len(all) == 0 {
-		return nil, nil
-	}
-	return all, nil
-}
-
-// withUnknown marshals known, which must marshal to a non-empty object, and
-// appends the unknown keys sorted, so that the output does not depend on the
-// order they were read in.
-func withUnknown(known any, unknown map[string]json.RawMessage) ([]byte, error) {
-	data, err := json.Marshal(known)
-	if err != nil || len(unknown) == 0 {
-		return data, err
-	}
-	keys := make([]string, 0, len(unknown))
-	for key := range unknown {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	buf := bytes.NewBuffer(data[:len(data)-1])
-	for _, key := range keys {
-		name, err := json.Marshal(key)
-		if err != nil {
-			return nil, err
-		}
-		buf.WriteByte(',')
-		buf.Write(name)
-		buf.WriteByte(':')
-		buf.Write(unknown[key])
-	}
-	buf.WriteByte('}')
-	return buf.Bytes(), nil
-}
-
-func isObject(data json.RawMessage) bool {
-	var obj map[string]json.RawMessage
-	return json.Unmarshal(data, &obj) == nil && obj != nil
 }
 
 // migrateIndexes makes the default registry, which releases before the

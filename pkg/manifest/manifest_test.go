@@ -188,3 +188,46 @@ func TestLegacyKeysAreNotUnknown(t *testing.T) {
 		t.Fatalf("got unknown keys %v, want none", keys)
 	}
 }
+
+func TestLoadRejectsDuplicateKeys(t *testing.T) {
+	for _, content := range []string{
+		`{"name":"test","odoo_series":"19.0","odoo_series":"18.0","addons_dir":"addons/odoopack"}`,
+		`{"name":"test","odoo_series":"19.0","require":{"acme/x":"19.0","acme/x":"dev-19.0"},"addons_dir":"addons/odoopack"}`,
+	} {
+		useManifest(t, content)
+		if _, err := Load(); err == nil || !strings.Contains(err.Error(), "duplicate") {
+			t.Errorf("%s: got error %v, want one about the duplicate key", content, err)
+		}
+	}
+}
+
+func TestLoadMatchesKeysExactly(t *testing.T) {
+	useManifest(t, `{"name":"test","odoo_series":"19.0","Require":{"acme/x":"19.0"},"addons_dir":"addons/odoopack"}`)
+
+	m, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(m.Require) != 0 || strings.Join(m.UnknownKeys(), ",") != "Require" {
+		t.Fatalf("got require %v and unknown keys %v, want Require kept as an unknown key", m.Require, m.UnknownKeys())
+	}
+}
+
+func TestSaveDoesNotEscapeHTML(t *testing.T) {
+	path := useManifest(t, `{"name":"a&b","odoo_series":"19.0","addons_dir":"addons/odoopack","extra":{"note":"<x>"}}`)
+
+	m, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Save(*m); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(data, []byte(`"a&b"`)) || !bytes.Contains(data, []byte(`"<x>"`)) {
+		t.Fatalf("manifest escapes HTML:\n%s", data)
+	}
+}

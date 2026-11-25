@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -194,7 +195,7 @@ func TestLoadReadsLegacyKeysAndKeepsContentHash(t *testing.T) {
 func TestUnknownIndexKeysKeepContentHash(t *testing.T) {
 	require := map[string]string{"acme/health-check": "19.0"}
 	plain := manifest.Indexes{{Name: "company", Url: "https://registry.example.com", Type: "registry"}}
-	extended := manifest.Indexes{{Name: "company", Url: "https://registry.example.com", Type: "registry", Unknown: map[string]json.RawMessage{"priority": json.RawMessage(`10`)}}}
+	extended := manifest.Indexes{{Name: "company", Url: "https://registry.example.com", Type: "registry", Unknown: map[string]jsontext.Value{"priority": jsontext.Value(`10`)}}}
 
 	hash, err := ComputeHash(require, plain, "19.0", nil)
 	if err != nil {

@@ -37,10 +37,18 @@ func (m Manifest) Validate() error {
 			errs = append(errs, fmt.Errorf("require %s: %w", pkg, err))
 		}
 	}
+	if len(m.Extra) > 0 && m.Extra.Kind() != '{' {
+		errs = append(errs, errors.New("extra must be an object"))
+	}
+	seen := make(map[string]bool, len(m.Indexes))
 	for _, idx := range m.Indexes {
 		if err := idx.Validate(); err != nil {
 			errs = append(errs, err)
 		}
+		if seen[idx.Name] {
+			errs = append(errs, fmt.Errorf("index name %q is used twice", idx.Name))
+		}
+		seen[idx.Name] = true
 	}
 	return errors.Join(errs...)
 }
