@@ -44,8 +44,8 @@ func serveRegistry(t *testing.T, addons ...registryapi.Addon) string {
 	return srv.URL
 }
 
-func lockedAt(dist lockfile.Dist, version string, direct bool, depends ...string) lockfile.LockedPackage {
-	return lockfile.LockedPackage{Version: version, Dist: dist, Direct: direct, Depends: depends, Index: "a"}
+func lockedAt(indexURL string, dist lockfile.Dist, version string, direct bool, depends ...string) lockfile.LockedPackage {
+	return lockfile.LockedPackage{Version: version, Dist: dist, Direct: direct, Depends: depends, IndexURL: indexURL}
 }
 
 // project writes m and a lockfile with packages into a temporary project
@@ -114,8 +114,8 @@ func TestRequireInstallsChangedPackages(t *testing.T) {
 	m.Indexes = manifest.Indexes{{Name: "a", Url: url, Type: "registry"}}
 	m.Require = manifest.Requirements{"acme/base-tools": "19.0", "acme/other": "19.0"}
 	project(t, m, map[string]lockfile.LockedPackage{
-		"acme/base-tools": lockedAt(dist, "19.0.1.0.0", true),
-		"acme/other":      lockedAt(dist, "19.0.1.0.0", true),
+		"acme/base-tools": lockedAt(url, dist, "19.0.1.0.0", true),
+		"acme/other":      lockedAt(url, dist, "19.0.1.0.0", true),
 	})
 
 	requireCmd.Run(requireCmd, []string{"acme/health-check"})
@@ -149,9 +149,9 @@ func TestUpdateOneResolvesItsTree(t *testing.T) {
 	m.Indexes = manifest.Indexes{{Name: "a", Url: url, Type: "registry"}}
 	m.Require = manifest.Requirements{"acme/health-check": "19.0", "acme/other": "19.0"}
 	project(t, m, map[string]lockfile.LockedPackage{
-		"acme/health-check": lockedAt(dist, "19.0.1.0.0", true, "acme/old-dep"),
-		"acme/old-dep":      lockedAt(dist, "19.0.1.0.0", false),
-		"acme/other":        lockedAt(dist, "19.0.1.0.0", true),
+		"acme/health-check": lockedAt(url, dist, "19.0.1.0.0", true, "acme/old-dep"),
+		"acme/old-dep":      lockedAt(url, dist, "19.0.1.0.0", false),
+		"acme/other":        lockedAt(url, dist, "19.0.1.0.0", true),
 	})
 
 	updateCmd.Run(updateCmd, []string{"acme/health-check"})
@@ -179,13 +179,14 @@ func TestRemoveRemovesOrphans(t *testing.T) {
 	dist := addonZip(t)
 	m := manifest.NewManifest("test", "addons/odoopack", "19.0")
 	// Every package stays locked as it is, so remove must not ask the index.
-	m.Indexes = manifest.Indexes{{Name: "a", Url: "http://127.0.0.1:1", Type: "registry"}}
+	url := "http://127.0.0.1:1"
+	m.Indexes = manifest.Indexes{{Name: "a", Url: url, Type: "registry"}}
 	m.Require = manifest.Requirements{"acme/health-check": "19.0", "acme/other": "19.0"}
 	project(t, m, map[string]lockfile.LockedPackage{
-		"acme/health-check": lockedAt(dist, "19.0.1.0.0", true, "acme/base-tools", "acme/shared"),
-		"acme/base-tools":   lockedAt(dist, "19.0.1.0.0", false),
-		"acme/other":        lockedAt(dist, "19.0.1.0.0", true, "acme/shared"),
-		"acme/shared":       lockedAt(dist, "19.0.1.0.0", false),
+		"acme/health-check": lockedAt(url, dist, "19.0.1.0.0", true, "acme/base-tools", "acme/shared"),
+		"acme/base-tools":   lockedAt(url, dist, "19.0.1.0.0", false),
+		"acme/other":        lockedAt(url, dist, "19.0.1.0.0", true, "acme/shared"),
+		"acme/shared":       lockedAt(url, dist, "19.0.1.0.0", false),
 	})
 
 	removeCmd.Run(removeCmd, []string{"acme/health-check"})
@@ -228,16 +229,17 @@ func TestRemoveRefusesWhileDependedOn(t *testing.T) {
 
 	shasum := "sha256:ece96e65881389c3ef6538ea26b9d7149e8e0af042c828d17283c6b76c633543"
 	dist := lockfile.Dist{Type: "zip", URL: "https://example.com/x.zip", Digest: shasum}
+	url := "http://127.0.0.1:1"
 	lock, err := json.Marshal(lockfile.LockFile{FormatVersion: lockfile.FormatVersion, ContentHash: "sha256:00", Packages: map[string]lockfile.LockedPackage{
-		"acme/health-check": lockedAt(dist, "19.0.1.0.0", true, "acme/base-tools"),
-		"acme/base-tools":   lockedAt(dist, "19.0.1.0.0", true),
-		"acme/other":        lockedAt(dist, "19.0.1.0.0", true, "acme/base-tools"),
+		"acme/health-check": lockedAt(url, dist, "19.0.1.0.0", true, "acme/base-tools"),
+		"acme/base-tools":   lockedAt(url, dist, "19.0.1.0.0", true),
+		"acme/other":        lockedAt(url, dist, "19.0.1.0.0", true, "acme/base-tools"),
 	}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, out := installInChild(t, map[string]string{
-		"odoopack.json": `{"name":"test","odoo":"19.0","require":{"acme/health-check":"19.0","acme/base-tools":"19.0","acme/other":"19.0"},"indexes":{"a":{"url":"http://127.0.0.1:1","type":"registry"}},"addons_path":"addons/odoopack"}`,
+		"odoopack.json": `{"name":"test","odoo_series":"19.0","require":{"acme/health-check":"19.0","acme/base-tools":"19.0","acme/other":"19.0"},"indexes":[{"name":"a","url":"http://127.0.0.1:1","type":"registry"}],"addons_dir":"addons/odoopack"}`,
 		"odoopack.lock": string(lock),
 		filepath.Join("addons", "odoopack", addonsdir.MarkerName):                 "",
 		filepath.Join("addons", "odoopack", "acme_base_tools", "__manifest__.py"): "{}",

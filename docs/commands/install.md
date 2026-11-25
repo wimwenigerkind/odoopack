@@ -51,4 +51,3 @@ odoopack.lock is out of date with odoopack.json; run 'odoopack install' without 
 
 Use it in CI, so that a manifest change committed without its lockfile fails the build instead of installing versions nobody reviewed. `require`, `update` and `remove` always write the lockfile and do not take the flag.
 
-A lockfile written by an odoopack before the `odoo_series` became part of the content hash is still accepted, so upgrading odoopack does not fail a frozen install. Such a lockfile does not notice a change of the series until odoopack writes it again: run `odoopack update` after changing the series.

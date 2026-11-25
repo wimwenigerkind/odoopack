@@ -42,7 +42,7 @@ var requireCmd = &cobra.Command{
 			fatal(fmt.Errorf("%s: %w", addon, err))
 		}
 
-		lookup, err := index.LookupLocked(m.Indexes, oldLock.Packages[addonName].LockedTo(), addonName, constraint, m.OdooSeries)
+		lookup, err := index.LookupLocked(m.Indexes, oldLock.Packages[addonName].IndexURL, addonName, constraint, m.OdooSeries)
 		if err != nil {
 			fatal(err)
 		}
