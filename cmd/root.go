@@ -49,7 +49,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.odoopack.yaml)")
 
 	viper.SetDefault("default_index_url", "https://odoopack.dev")
-	viper.SetDefault("addons_path", "addons/odoopack")
+	viper.SetDefault("addons_dir", "addons/odoopack")
 	viper.SetDefault("manifest", "odoopack.json")
 	viper.SetDefault("lock", "odoopack.lock")
 
@@ -71,6 +71,9 @@ func initConfig() {
 		viper.SetConfigName(".odoopack")
 	}
 
+	// Every key reads ODOOPACK_<KEY>, so that a generic variable such as
+	// MANIFEST or LOCK in a CI job cannot change what odoopack reads.
+	viper.SetEnvPrefix("odoopack")
 	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err == nil {

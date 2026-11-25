@@ -123,7 +123,7 @@ func TestRemoveAddonRejectsNames(t *testing.T) {
 		}
 	}
 	if _, err := os.Stat(filepath.Join(dir, MarkerName)); err != nil {
-		t.Fatalf("addons_path was touched: %v", err)
+		t.Fatalf("addons_dir was touched: %v", err)
 	}
 }
 

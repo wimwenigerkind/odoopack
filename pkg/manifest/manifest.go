@@ -69,7 +69,7 @@ func Init(name, odoo string) (Manifest, error) {
 		return Manifest{}, fmt.Errorf("odoopack.json already exists")
 	}
 
-	manifest := NewManifest(name, viper.GetString("addons_path"), odoo)
+	manifest := NewManifest(name, viper.GetString("addons_dir"), odoo)
 	if defaultURL := viper.GetString("default_index_url"); defaultURL != "" {
 		manifest.Indexes = append(manifest.Indexes, Index{Name: DefaultIndexName, Url: defaultURL, Type: "registry"})
 	}
