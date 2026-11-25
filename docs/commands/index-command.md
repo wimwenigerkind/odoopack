@@ -16,7 +16,7 @@ odoopack index list
 
 ### `index add <name> <url>`
 
-Add or replace an index. The URL must include a scheme and host. A new index is searched first, before the indexes already there, so that a private registry wins over the public one; with `--append` it is searched last. An index with the same name is replaced at its position.
+Add or replace an index. The name takes lowercase letters, digits, `_` and `-`. The URL is `https://` or `http://` with a host and an optional path; a URL with credentials, a query or a fragment is refused, since the manifest is committed and tokens belong in `ODOOPACK_AUTH`. A new index is searched first, before the indexes already there, so that a private registry wins over the public one; with `--append` it is searched last. An index with the same name is replaced at its position.
 
 ```console
 $ odoopack index add company https://registry.example.com

@@ -5,7 +5,6 @@ package cmd
 
 import (
 	"fmt"
-	"net/url"
 	"strconv"
 
 	"github.com/spf13/cobra"
@@ -35,19 +34,16 @@ is.`,
 		name := args[0]
 		raw := args[1]
 
-		if name == "" {
-			fatal(fmt.Errorf("index name must not be empty"))
-		}
-		u, err := url.Parse(raw)
-		if err != nil || u.Scheme == "" || u.Host == "" {
-			fatal(fmt.Errorf("invalid url %q", raw))
+		idx := manifest.Index{Name: name, Url: raw, Type: indexAddType}
+		if err := idx.Validate(); err != nil {
+			fatal(err)
 		}
 
 		m, err := manifest.Load()
 		if err != nil {
 			fatal(err)
 		}
-		m.Indexes = m.Indexes.Add(manifest.Index{Name: name, Url: raw, Type: indexAddType}, indexAddAppend)
+		m.Indexes = m.Indexes.Add(idx, indexAddAppend)
 		if err := manifest.Save(*m); err != nil {
 			fatal(err)
 		}
