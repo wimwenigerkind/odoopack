@@ -46,7 +46,7 @@ func Load() (LockFile, error) {
 		return LockFile{}, err
 	}
 	if !exists {
-		return LockFile{}, fmt.Errorf("odoopack.lock not found")
+		return LockFile{}, fmt.Errorf("%s not found", viper.GetString("lock"))
 	}
 
 	data, err := os.ReadFile(viper.GetString("lock"))

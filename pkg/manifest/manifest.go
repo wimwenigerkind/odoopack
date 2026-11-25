@@ -17,7 +17,7 @@ func Load() (*Manifest, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, fmt.Errorf("odoopack.json not found, run 'odoopack init' first")
+		return nil, fmt.Errorf("%s not found, run 'odoopack init' first", viper.GetString("manifest"))
 	}
 
 	data, err := os.ReadFile(viper.GetString("manifest"))
@@ -66,7 +66,7 @@ func Init(name, odoo string) (Manifest, error) {
 		return Manifest{}, err
 	}
 	if exists {
-		return Manifest{}, fmt.Errorf("odoopack.json already exists")
+		return Manifest{}, fmt.Errorf("%s already exists", viper.GetString("manifest"))
 	}
 
 	manifest := NewManifest(name, viper.GetString("addons_dir"), odoo)
