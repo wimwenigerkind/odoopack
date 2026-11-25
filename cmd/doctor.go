@@ -5,7 +5,6 @@ package cmd
 
 import (
 	"os"
-	"regexp"
 
 	"github.com/spf13/cobra"
 	"github.com/wimwenigerkind/odoopack-spec/version"
@@ -14,8 +13,6 @@ import (
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
 	"github.com/wimwenigerkind/odoopack/pkg/ui"
 )
-
-var seriesPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+$`)
 
 var doctorCmd = &cobra.Command{
 	Use:   "doctor",
@@ -37,14 +34,9 @@ var doctorCmd = &cobra.Command{
 			ok("name: %s", m.Name)
 		}
 
-		switch {
-		case m.OdooSeries == "":
-			bad("odoo series not set (add \"odoo_series\": \"19.0\" to odoopack.json)")
-		case !seriesPattern.MatchString(m.OdooSeries):
-			bad("odoo_series %q is not a valid series (expected like 19.0)", m.OdooSeries)
-		default:
-			ok("odoo series: %s", m.OdooSeries)
-		}
+		// Load refuses an invalid series, index or constraint, so doctor
+		// only checks what it does not.
+		ok("odoo series: %s", m.OdooSeries)
 
 		if wd, err := os.Getwd(); err != nil {
 			bad("addons_dir: %v", err)
@@ -59,25 +51,9 @@ var doctorCmd = &cobra.Command{
 		} else {
 			ok("%d index(es) configured", len(m.Indexes))
 		}
-		for _, idx := range m.Indexes {
-			if idx.Url == "" {
-				bad("index %q has no url", idx.Name)
-			}
-			if idx.Type == "" {
-				warn("index %q has no type", idx.Name)
-			}
-		}
 
 		for name, constraint := range m.Require {
-			if constraint == "" {
-				bad("require %s has an empty constraint", name)
-				continue
-			}
-			if _, err := version.ParseConstraint(constraint); err != nil {
-				bad("require %s: invalid constraint %q (%v)", name, constraint, err)
-				continue
-			}
-			if v, err := version.Parse(constraint); err == nil && v.IsRelease() && m.OdooSeries != "" && v.SeriesString() != m.OdooSeries {
+			if v, err := version.Parse(constraint); err == nil && v.IsRelease() && v.SeriesString() != m.OdooSeries {
 				warn("require %s pins %s which targets Odoo %s, but the project is %s", name, constraint, v.SeriesString(), m.OdooSeries)
 			}
 		}

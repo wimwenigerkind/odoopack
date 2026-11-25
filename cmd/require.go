@@ -38,8 +38,8 @@ var requireCmd = &cobra.Command{
 		if constraint == "" {
 			constraint = m.OdooSeries
 		}
-		if constraint == "" {
-			fatal(fmt.Errorf("no version given and no \"odoo_series\" set in the manifest; use %s@<version> (e.g. 19.0.1.0.0 or dev-19.0)", addonName))
+		if err := manifest.ValidConstraint(constraint); err != nil {
+			fatal(fmt.Errorf("%s: %w", addon, err))
 		}
 
 		lookup, err := index.LookupLocked(m.Indexes, oldLock.Packages[addonName].LockedTo(), addonName, constraint, m.OdooSeries)

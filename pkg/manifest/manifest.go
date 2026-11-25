@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/spf13/viper"
-	"github.com/wimwenigerkind/odoopack-spec/name"
 	"github.com/wimwenigerkind/odoopack/pkg/helper"
 	"github.com/wimwenigerkind/odoopack/pkg/ui"
 )
@@ -40,10 +39,8 @@ func Load() (*Manifest, error) {
 	for _, key := range manifest.UnknownKeys() {
 		ui.Warn("%s: unknown key %q is kept but ignored by this odoopack", viper.GetString("manifest"), key)
 	}
-	for pkg := range manifest.Require {
-		if err := name.ValidPackage(pkg); err != nil {
-			return nil, fmt.Errorf("%s: %w", viper.GetString("manifest"), err)
-		}
+	if err := manifest.Validate(); err != nil {
+		return nil, fmt.Errorf("%s: %w", viper.GetString("manifest"), err)
 	}
 
 	return &manifest, nil
@@ -51,6 +48,11 @@ func Load() (*Manifest, error) {
 
 func Save(manifest Manifest) error {
 	manifest.FormatVersion = FormatVersion
+	// A command validates its input before it changes anything; this keeps a
+	// mistake in one from writing a manifest no odoopack would load again.
+	if err := manifest.Validate(); err != nil {
+		return fmt.Errorf("refusing to write %s: %w", viper.GetString("manifest"), err)
+	}
 	data, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
 		return err
