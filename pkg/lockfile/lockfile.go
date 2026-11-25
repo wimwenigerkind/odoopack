@@ -99,7 +99,7 @@ func Save(lockFile LockFile) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(viper.GetString("lock"), data, 0644)
+	return helper.WriteJSONFile(viper.GetString("lock"), data)
 }
 
 // ComputeHash covers what the manifest resolves the packages from, so that

@@ -135,7 +135,7 @@ func TestSaveKeepsUnknownKeys(t *testing.T) {
     ]
   }
 }`
-	if string(data) != want {
+	if string(data) != want+"\n" {
 		t.Fatalf("got\n%s\nwant\n%s", data, want)
 	}
 }

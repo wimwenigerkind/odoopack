@@ -57,7 +57,7 @@ func Save(manifest Manifest) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(viper.GetString("manifest"), data, 0644)
+	return helper.WriteJSONFile(viper.GetString("manifest"), data)
 }
 
 func Init(name, odoo string) (Manifest, error) {
