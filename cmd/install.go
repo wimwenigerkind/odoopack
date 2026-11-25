@@ -10,7 +10,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/wimwenigerkind/odoopack-spec/name"
 	"github.com/wimwenigerkind/odoopack/pkg/addonsdir"
 	"github.com/wimwenigerkind/odoopack/pkg/helper"
 	"github.com/wimwenigerkind/odoopack/pkg/installer"
@@ -125,8 +124,8 @@ func checkAddonsPath(m *manifest.Manifest) {
 func lockedDirs(locks ...map[string]lockfile.LockedPackage) map[string]bool {
 	dirs := make(map[string]bool)
 	for _, packages := range locks {
-		for addon := range packages {
-			dirs[name.ModuleName(addon)] = true
+		for _, pkg := range packages {
+			dirs[pkg.Module] = true
 		}
 	}
 	return dirs

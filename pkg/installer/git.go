@@ -19,7 +19,7 @@ func NewGitInstaller() *GitInstaller {
 }
 
 func (i *GitInstaller) Install(targetDir string, addonName string, pkg lockfile.LockedPackage) error {
-	dest, err := addonDir(targetDir, addonName)
+	dest, err := addonDir(targetDir, pkg)
 	if err != nil {
 		return err
 	}

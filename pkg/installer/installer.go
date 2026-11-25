@@ -29,12 +29,13 @@ func New(sourceType string) (Installer, error) {
 	}
 }
 
-// addonDir returns the directory addonName installs to in targetDir.
-func addonDir(targetDir, addonName string) (string, error) {
-	if err := name.ValidPackage(addonName); err != nil {
+// addonDir returns the directory pkg installs to in targetDir. It checks the
+// module again, since the lockfile it comes from may be edited by hand.
+func addonDir(targetDir string, pkg lockfile.LockedPackage) (string, error) {
+	if err := name.ValidModule(pkg.Module); err != nil {
 		return "", err
 	}
-	return filepath.Join(targetDir, name.ModuleName(addonName)), nil
+	return filepath.Join(targetDir, pkg.Module), nil
 }
 
 // checkIntegrity refuses a package the installer could not verify, such as a

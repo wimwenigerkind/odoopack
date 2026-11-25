@@ -6,7 +6,6 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/wimwenigerkind/odoopack-spec/name"
 	"github.com/wimwenigerkind/odoopack/pkg/addonsdir"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
@@ -24,7 +23,7 @@ func applyLock(m *manifest.Manifest, prev, next lockfile.LockFile) (installed, r
 	// Removing first frees the directory of a dropped package for a new one
 	// with the same module name.
 	for _, pkg := range remove {
-		if err := addonsdir.RemoveAddon(m.AddonsDir, name.ModuleName(pkg), owned); err != nil {
+		if err := addonsdir.RemoveAddon(m.AddonsDir, prev.Packages[pkg].Module, owned); err != nil {
 			return 0, 0, err
 		}
 	}

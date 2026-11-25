@@ -89,6 +89,7 @@ func (r *gitRepo) tag(name, commit string) {
 func (r *gitRepo) locked(commit string) lockfile.LockedPackage {
 	return lockfile.LockedPackage{
 		Version: "19.0.1.0.0",
+		Module:  "acme_health_check",
 		Dist:    lockfile.Dist{Type: "git", URL: r.url, Reference: commit},
 	}
 }
@@ -188,7 +189,7 @@ func TestGitInstallRejectsHeadMismatch(t *testing.T) {
 
 func TestGitInstallRequiresReference(t *testing.T) {
 	for _, reference := range []string{"", "19.0.1.0.0", "abc123", strings.Repeat("A", 40)} {
-		pkg := lockfile.LockedPackage{Version: "19.0.1.0.0", Dist: lockfile.Dist{Type: "git", URL: "https://example.com/acme.git", Reference: reference}}
+		pkg := lockfile.LockedPackage{Version: "19.0.1.0.0", Module: "acme_health_check", Dist: lockfile.Dist{Type: "git", URL: "https://example.com/acme.git", Reference: reference}}
 		err := NewGitInstaller().Install(t.TempDir(), "acme/health-check", pkg)
 		if err == nil || !strings.Contains(err.Error(), "odoopack update acme/health-check") {
 			t.Errorf("reference %q: got error %v, want one asking to lock again", reference, err)
@@ -212,7 +213,7 @@ func TestGitInstallRefusesURL(t *testing.T) {
 		"C:/git/acme.git",
 		"",
 	} {
-		pkg := lockfile.LockedPackage{Dist: lockfile.Dist{Type: "git", URL: url, Reference: commit}}
+		pkg := lockfile.LockedPackage{Module: "acme_health_check", Dist: lockfile.Dist{Type: "git", URL: url, Reference: commit}}
 		target := filepath.Join(t.TempDir(), "addons")
 		if err := NewGitInstaller().Install(target, "acme/health-check", pkg); err == nil {
 			t.Errorf("url %q was accepted", url)

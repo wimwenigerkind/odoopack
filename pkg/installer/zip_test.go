@@ -48,7 +48,7 @@ func serveAddonZip(t *testing.T) (*httptest.Server, string, *atomic.Int32) {
 
 func TestZipInstallReusesStore(t *testing.T) {
 	srv, shasum, downloads := serveAddonZip(t)
-	pkg := lockfile.LockedPackage{Dist: lockfile.Dist{Type: "zip", URL: srv.URL, Digest: shasum}}
+	pkg := lockfile.LockedPackage{Module: "acme_health_check", Dist: lockfile.Dist{Type: "zip", URL: srv.URL, Digest: shasum}}
 	inst := NewZipInstaller(store.New(t.TempDir()))
 
 	first := t.TempDir()
@@ -77,7 +77,7 @@ func TestZipInstallReusesStore(t *testing.T) {
 
 func TestZipInstallWithoutStore(t *testing.T) {
 	srv, shasum, downloads := serveAddonZip(t)
-	pkg := lockfile.LockedPackage{Dist: lockfile.Dist{Type: "zip", URL: srv.URL, Digest: shasum}}
+	pkg := lockfile.LockedPackage{Module: "acme_health_check", Dist: lockfile.Dist{Type: "zip", URL: srv.URL, Digest: shasum}}
 	inst := NewZipInstaller(nil)
 
 	target := t.TempDir()
@@ -102,7 +102,7 @@ func TestZipInstallWithoutStore(t *testing.T) {
 func TestZipInstallRejectsShasumMismatch(t *testing.T) {
 	srv, _, _ := serveAddonZip(t)
 	wrong := fmt.Sprintf("sha256:%x", sha256.Sum256([]byte("other")))
-	pkg := lockfile.LockedPackage{Dist: lockfile.Dist{Type: "zip", URL: srv.URL, Digest: wrong}}
+	pkg := lockfile.LockedPackage{Module: "acme_health_check", Dist: lockfile.Dist{Type: "zip", URL: srv.URL, Digest: wrong}}
 	storeDir := t.TempDir()
 	inst := NewZipInstaller(store.New(storeDir))
 
@@ -127,7 +127,7 @@ func TestZipInstallRejectsMalformedShasum(t *testing.T) {
 		shasum[:len(shasum)-1],
 		shasum[:len(shasum)-1] + "z",
 	} {
-		pkg := lockfile.LockedPackage{Dist: lockfile.Dist{Type: "zip", URL: srv.URL, Digest: malformed}}
+		pkg := lockfile.LockedPackage{Module: "acme_health_check", Dist: lockfile.Dist{Type: "zip", URL: srv.URL, Digest: malformed}}
 		target := filepath.Join(t.TempDir(), "addons")
 		err := NewZipInstaller(store.New(t.TempDir())).Install(target, "acme/health-check", pkg)
 		if err == nil || !strings.Contains(err.Error(), "digest:") {
@@ -145,7 +145,7 @@ func TestZipInstallRejectsMalformedShasum(t *testing.T) {
 // A lockfile written before odoopack required a shasum may lack one.
 func TestZipInstallRequiresDigest(t *testing.T) {
 	srv, _, downloads := serveAddonZip(t)
-	pkg := lockfile.LockedPackage{Dist: lockfile.Dist{Type: "zip", URL: srv.URL}}
+	pkg := lockfile.LockedPackage{Module: "acme_health_check", Dist: lockfile.Dist{Type: "zip", URL: srv.URL}}
 	for _, st := range []*store.Store{store.New(t.TempDir()), nil} {
 		target := filepath.Join(t.TempDir(), "addons")
 		err := NewZipInstaller(st).Install(target, "acme/health-check", pkg)
@@ -358,5 +358,33 @@ func TestDownloadLeavesNoTempFileOnError(t *testing.T) {
 				t.Fatalf("left %v in the temp directory", left)
 			}
 		})
+	}
+}
+
+func TestZipInstallUsesLockedModule(t *testing.T) {
+	srv, shasum, _ := serveAddonZip(t)
+	pkg := lockfile.LockedPackage{Module: "health_check", Dist: lockfile.Dist{Type: "zip", URL: srv.URL, Digest: shasum}}
+	target := t.TempDir()
+
+	if err := NewZipInstaller(nil).Install(target, "acme/health-check", pkg); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(target, "health_check", "__manifest__.py")); err != nil {
+		t.Fatalf("not installed into the locked module: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(target, "acme_health_check")); !os.IsNotExist(err) {
+		t.Fatalf("installed into the directory derived from the package name: %v", err)
+	}
+}
+
+func TestZipInstallRejectsInvalidModule(t *testing.T) {
+	srv, shasum, downloads := serveAddonZip(t)
+	pkg := lockfile.LockedPackage{Module: "../evil", Dist: lockfile.Dist{Type: "zip", URL: srv.URL, Digest: shasum}}
+
+	if err := NewZipInstaller(nil).Install(t.TempDir(), "acme/health-check", pkg); err == nil {
+		t.Fatal("installed a package with an invalid module")
+	}
+	if n := downloads.Load(); n != 0 {
+		t.Fatalf("downloaded %d times before refusing the module", n)
 	}
 }
