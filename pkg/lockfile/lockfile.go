@@ -2,7 +2,9 @@ package lockfile
 
 import (
 	"crypto/sha256"
-	"encoding/json"
+	jsonv1 "encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"os"
 	"sort"
@@ -55,18 +57,6 @@ func Load() (LockFile, error) {
 	if err := json.Unmarshal(data, &lockFile); err != nil {
 		return LockFile{}, err
 	}
-	if lockFile.FormatVersion == 0 {
-		// Releases before format_version wrote the same number as "format".
-		// Save writes format_version only, so the old key goes away with the
-		// next write.
-		var legacy struct {
-			Format int `json:"format"`
-		}
-		if err := json.Unmarshal(data, &legacy); err != nil {
-			return LockFile{}, err
-		}
-		lockFile.FormatVersion = legacy.Format
-	}
 	lockFile.FormatVersion, err = helper.CheckFormatVersion(viper.GetString("lock"), lockFile.FormatVersion, FormatVersion)
 	if err != nil {
 		return LockFile{}, err
@@ -106,7 +96,7 @@ func CheckModuleCollisions(packages map[string]LockedPackage) error {
 
 func Save(lockFile LockFile) error {
 	lockFile.FormatVersion = FormatVersion
-	data, err := json.MarshalIndent(lockFile, "", "  ")
+	data, err := json.Marshal(lockFile, jsontext.WithIndent("  "), json.Deterministic(true))
 	if err != nil {
 		return err
 	}
@@ -215,8 +205,11 @@ func legacyHash(require map[string]string, indexes manifest.Indexes, packages ma
 	}{Require: require, Indexes: namedIndexes(indexes), Packages: hashedPackages(packages)})
 }
 
+// hashJSON keeps encoding/json v1, whose output defines every content_hash
+// written so far: v2 escapes and orders differently, which would make every
+// lockfile stale.
 func hashJSON(payload any) (string, error) {
-	data, err := json.Marshal(payload)
+	data, err := jsonv1.Marshal(payload)
 	if err != nil {
 		return "", err
 	}

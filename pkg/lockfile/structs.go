@@ -1,6 +1,6 @@
 package lockfile
 
-import "encoding/json"
+import "encoding/json/v2"
 
 type Dist struct {
 	Type      string `json:"type"`
@@ -85,4 +85,23 @@ type LockFile struct {
 	FormatVersion int                      `json:"format_version"`
 	ContentHash   string                   `json:"content_hash"`
 	Packages      map[string]LockedPackage `json:"packages"`
+}
+
+// UnmarshalJSON also reads format, which releases before format_version
+// wrote. Save writes format_version only, so the old key goes away with the
+// next write.
+func (lf *LockFile) UnmarshalJSON(data []byte) error {
+	type plain LockFile
+	var v struct {
+		plain
+		Format int `json:"format"`
+	}
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	*lf = LockFile(v.plain)
+	if lf.FormatVersion == 0 {
+		lf.FormatVersion = v.Format
+	}
+	return nil
 }
