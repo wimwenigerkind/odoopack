@@ -11,12 +11,14 @@ The lockfile pins the exact distribution of every requirement so that installs a
   "packages": {
     "acme/health-check": {
       "version": "19.0.1.0.0",
+      "module": "acme_health_check",
       "dist": {
         "type": "zip",
         "url": "https://registry.example.com/registry/v1/zipball/<id>/<reference>",
         "reference": "<git-sha>",
         "digest": "sha256:<hex>"
       },
+      "direct": true,
       "index_url": "https://registry.example.com"
     }
   }
@@ -36,6 +38,7 @@ The lockfile pins the exact distribution of every requirement so that installs a
 | Field | Type | Description |
 | --- | --- | --- |
 | `version` | string | The resolved version. |
+| `module` | string | Directory the package installs to inside `addons_dir`, the technical name of its Odoo module: lowercase letters, digits and `_`. odoopack sets it when it locks the package, currently by replacing `/` and `-` in the package name with `_`, and from then on takes it from here: install, update and remove never derive it again. Two packages with the same module are refused. |
 | `dist.type` | string | Distribution type: `zip` or `git`. |
 | `dist.url` | string | Download URL (zip) or clone URL (git). |
 | `dist.reference` | string | Git reference (commit SHA) the distribution was built from. |

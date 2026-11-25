@@ -8,7 +8,13 @@ type Dist struct {
 }
 
 type LockedPackage struct {
-	Version         string   `json:"version"`
+	Version string `json:"version"`
+	// Module is the directory the package installs to, the technical name
+	// of its Odoo module. Every command takes it from here instead of
+	// deriving it from the package name, so the rule that derives it can
+	// change, and a package can name a module of another name, without
+	// moving an installed addon.
+	Module          string   `json:"module"`
 	Dist            Dist     `json:"dist"`
 	Direct          bool     `json:"direct"`
 	Depends         []string `json:"depends,omitempty"`

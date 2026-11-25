@@ -44,8 +44,8 @@ func serveRegistry(t *testing.T, addons ...registryapi.Addon) string {
 	return srv.URL
 }
 
-func lockedAt(indexURL string, dist lockfile.Dist, version string, direct bool, depends ...string) lockfile.LockedPackage {
-	return lockfile.LockedPackage{Version: version, Dist: dist, Direct: direct, Depends: depends, IndexURL: indexURL}
+func lockedAt(pkg, indexURL string, dist lockfile.Dist, version string, direct bool, depends ...string) lockfile.LockedPackage {
+	return lockfile.LockedPackage{Version: version, Module: name.ModuleName(pkg), Dist: dist, Direct: direct, Depends: depends, IndexURL: indexURL}
 }
 
 // project writes m and a lockfile with packages into a temporary project
@@ -114,8 +114,8 @@ func TestRequireInstallsChangedPackages(t *testing.T) {
 	m.Indexes = manifest.Indexes{{Name: "a", Url: url, Type: "registry"}}
 	m.Require = manifest.Requirements{"acme/base-tools": "19.0", "acme/other": "19.0"}
 	project(t, m, map[string]lockfile.LockedPackage{
-		"acme/base-tools": lockedAt(url, dist, "19.0.1.0.0", true),
-		"acme/other":      lockedAt(url, dist, "19.0.1.0.0", true),
+		"acme/base-tools": lockedAt("acme/base-tools", url, dist, "19.0.1.0.0", true),
+		"acme/other":      lockedAt("acme/other", url, dist, "19.0.1.0.0", true),
 	})
 
 	requireCmd.Run(requireCmd, []string{"acme/health-check"})
@@ -149,9 +149,9 @@ func TestUpdateOneResolvesItsTree(t *testing.T) {
 	m.Indexes = manifest.Indexes{{Name: "a", Url: url, Type: "registry"}}
 	m.Require = manifest.Requirements{"acme/health-check": "19.0", "acme/other": "19.0"}
 	project(t, m, map[string]lockfile.LockedPackage{
-		"acme/health-check": lockedAt(url, dist, "19.0.1.0.0", true, "acme/old-dep"),
-		"acme/old-dep":      lockedAt(url, dist, "19.0.1.0.0", false),
-		"acme/other":        lockedAt(url, dist, "19.0.1.0.0", true),
+		"acme/health-check": lockedAt("acme/health-check", url, dist, "19.0.1.0.0", true, "acme/old-dep"),
+		"acme/old-dep":      lockedAt("acme/old-dep", url, dist, "19.0.1.0.0", false),
+		"acme/other":        lockedAt("acme/other", url, dist, "19.0.1.0.0", true),
 	})
 
 	updateCmd.Run(updateCmd, []string{"acme/health-check"})
@@ -183,10 +183,10 @@ func TestRemoveRemovesOrphans(t *testing.T) {
 	m.Indexes = manifest.Indexes{{Name: "a", Url: url, Type: "registry"}}
 	m.Require = manifest.Requirements{"acme/health-check": "19.0", "acme/other": "19.0"}
 	project(t, m, map[string]lockfile.LockedPackage{
-		"acme/health-check": lockedAt(url, dist, "19.0.1.0.0", true, "acme/base-tools", "acme/shared"),
-		"acme/base-tools":   lockedAt(url, dist, "19.0.1.0.0", false),
-		"acme/other":        lockedAt(url, dist, "19.0.1.0.0", true, "acme/shared"),
-		"acme/shared":       lockedAt(url, dist, "19.0.1.0.0", false),
+		"acme/health-check": lockedAt("acme/health-check", url, dist, "19.0.1.0.0", true, "acme/base-tools", "acme/shared"),
+		"acme/base-tools":   lockedAt("acme/base-tools", url, dist, "19.0.1.0.0", false),
+		"acme/other":        lockedAt("acme/other", url, dist, "19.0.1.0.0", true, "acme/shared"),
+		"acme/shared":       lockedAt("acme/shared", url, dist, "19.0.1.0.0", false),
 	})
 
 	removeCmd.Run(removeCmd, []string{"acme/health-check"})
@@ -231,9 +231,9 @@ func TestRemoveRefusesWhileDependedOn(t *testing.T) {
 	dist := lockfile.Dist{Type: "zip", URL: "https://example.com/x.zip", Digest: shasum}
 	url := "http://127.0.0.1:1"
 	lock, err := json.Marshal(lockfile.LockFile{FormatVersion: lockfile.FormatVersion, ContentHash: "sha256:00", Packages: map[string]lockfile.LockedPackage{
-		"acme/health-check": lockedAt(url, dist, "19.0.1.0.0", true, "acme/base-tools"),
-		"acme/base-tools":   lockedAt(url, dist, "19.0.1.0.0", true),
-		"acme/other":        lockedAt(url, dist, "19.0.1.0.0", true, "acme/base-tools"),
+		"acme/health-check": lockedAt("acme/health-check", url, dist, "19.0.1.0.0", true, "acme/base-tools"),
+		"acme/base-tools":   lockedAt("acme/base-tools", url, dist, "19.0.1.0.0", true),
+		"acme/other":        lockedAt("acme/other", url, dist, "19.0.1.0.0", true, "acme/base-tools"),
 	}})
 	if err != nil {
 		t.Fatal(err)

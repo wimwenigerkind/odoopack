@@ -28,7 +28,7 @@ func NewZipInstaller(st *store.Store) *ZipInstaller {
 }
 
 func (i *ZipInstaller) Install(targetDir string, addonName string, pkg lockfile.LockedPackage) error {
-	dest, err := addonDir(targetDir, addonName)
+	dest, err := addonDir(targetDir, pkg)
 	if err != nil {
 		return err
 	}

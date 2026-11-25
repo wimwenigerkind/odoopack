@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/spf13/viper"
+	"github.com/wimwenigerkind/odoopack-spec/name"
 	"github.com/wimwenigerkind/odoopack/pkg/index"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
 )
@@ -32,7 +33,7 @@ func TestLoadOrNewRejectsInvalidName(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "odoopack.lock")
 	viper.Set("lock", path)
 	t.Cleanup(viper.Reset)
-	if err := os.WriteFile(path, []byte(`{"packages":{"../evil":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/x.git"}}}}`), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(`{"packages":{"../evil":{"version":"19.0.1.0.0","module":".._evil","dist":{"type":"git","url":"https://example.com/x.git"}}}}`), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -138,8 +139,8 @@ func TestLockPackageRequiresIntegrity(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if pkg.Dist.Type != tt.lookup.Type || pkg.Dist.Digest != tt.lookup.Shasum || pkg.Dist.Reference != tt.lookup.Reference {
-					t.Fatalf("locked %+v from %+v", pkg.Dist, tt.lookup)
+				if pkg.Module != "acme_health_check" || pkg.Dist.Type != tt.lookup.Type || pkg.Dist.Digest != tt.lookup.Shasum || pkg.Dist.Reference != tt.lookup.Reference {
+					t.Fatalf("locked %+v from %+v", pkg, tt.lookup)
 				}
 				return
 			}
@@ -170,7 +171,7 @@ func TestChangedSeriesMakesLockfileStale(t *testing.T) {
 	}
 }
 
-func TestCheckModuleCollisions(t *testing.T) {
+func TestCheckModules(t *testing.T) {
 	tests := []struct {
 		name     string
 		packages []string
@@ -186,9 +187,9 @@ func TestCheckModuleCollisions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			packages := make(map[string]LockedPackage)
 			for _, pkg := range tt.packages {
-				packages[pkg] = LockedPackage{}
+				packages[pkg] = LockedPackage{Module: name.ModuleName(pkg)}
 			}
-			err := CheckModuleCollisions(packages)
+			err := CheckModules(packages)
 			if tt.wantErr == "" {
 				if err != nil {
 					t.Fatal(err)
@@ -203,7 +204,7 @@ func TestCheckModuleCollisions(t *testing.T) {
 }
 
 func TestLoadRejectsModuleCollision(t *testing.T) {
-	path := useLock(t, `{"content_hash":"sha256:00","packages":{"acme/a-b":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/x.git"}},"acme/a_b":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/y.git"}}}}`)
+	path := useLock(t, `{"content_hash":"sha256:00","packages":{"acme/a-b":{"version":"19.0.1.0.0","module":"acme_a_b","dist":{"type":"git","url":"https://example.com/x.git"}},"acme/a_b":{"version":"19.0.1.0.0","module":"acme_a_b","dist":{"type":"git","url":"https://example.com/y.git"}}}}`)
 
 	_, err := Load()
 	if err == nil || !strings.Contains(err.Error(), path) || !strings.Contains(err.Error(), "acme/a-b and acme/a_b") {
@@ -212,7 +213,7 @@ func TestLoadRejectsModuleCollision(t *testing.T) {
 }
 
 func TestLoadRejectsDuplicateKeys(t *testing.T) {
-	useLock(t, `{"format_version":1,"content_hash":"sha256:00","packages":{"acme/x":{"version":"19.0.1.0.0","version":"19.0.2.0.0","dist":{"type":"git","url":"https://example.com/x.git"}}}}`)
+	useLock(t, `{"format_version":1,"content_hash":"sha256:00","packages":{"acme/x":{"version":"19.0.1.0.0","module":"acme_x","version":"19.0.2.0.0","dist":{"type":"git","url":"https://example.com/x.git"}}}}`)
 
 	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "duplicate") {
 		t.Fatalf("got error %v, want one about the duplicate key", err)
@@ -256,5 +257,14 @@ func TestMissingRequiredPackageIsStale(t *testing.T) {
 	packages := map[string]LockedPackage{"acme/health-check": {Version: "19.0.1.0.0"}}
 	if stale, err := IsStale(require, nil, "19.0", packages, hash); err != nil || !stale {
 		t.Fatalf("lockfile without a required package is not stale (%v)", err)
+	}
+}
+
+func TestLoadRejectsInvalidModule(t *testing.T) {
+	for _, module := range []string{"", "../evil", "acme/x", "Acme_X"} {
+		useLock(t, `{"content_hash":"sha256:00","packages":{"acme/x":{"version":"19.0.1.0.0","module":"`+module+`","dist":{"type":"git","url":"https://example.com/x.git"}}}}`)
+		if _, err := Load(); err == nil || !strings.Contains(err.Error(), "acme/x") {
+			t.Errorf("module %q: got error %v, want one naming the package", module, err)
+		}
 	}
 }

@@ -65,17 +65,18 @@ func Load() (LockFile, error) {
 			return LockFile{}, fmt.Errorf("%s: %w", viper.GetString("lock"), err)
 		}
 	}
-	if err := CheckModuleCollisions(lockFile.Packages); err != nil {
+	if err := CheckModules(lockFile.Packages); err != nil {
 		return LockFile{}, fmt.Errorf("%s: %w", viper.GetString("lock"), err)
 	}
 
 	return lockFile, nil
 }
 
-// CheckModuleCollisions refuses packages that install into the same addon
+// CheckModules refuses a module that is not a single directory name, which
+// could reach outside addons_dir, and packages that install into the same
 // directory, since one would silently overwrite the other: name.ModuleName
 // maps both "/" and "-" to "_".
-func CheckModuleCollisions(packages map[string]LockedPackage) error {
+func CheckModules(packages map[string]LockedPackage) error {
 	names := make([]string, 0, len(packages))
 	for pkg := range packages {
 		names = append(names, pkg)
@@ -84,7 +85,10 @@ func CheckModuleCollisions(packages map[string]LockedPackage) error {
 
 	owners := make(map[string]string, len(names))
 	for _, pkg := range names {
-		dir := name.ModuleName(pkg)
+		dir := packages[pkg].Module
+		if err := name.ValidModule(dir); err != nil {
+			return fmt.Errorf("package %s: %w", pkg, err)
+		}
 		if other, taken := owners[dir]; taken {
 			return fmt.Errorf("packages %s and %s both install to the addon directory %s", other, pkg, dir)
 		}
@@ -354,7 +358,7 @@ func (r *resolver) check(name, locked string, req requirement) error {
 }
 
 func (r *resolver) lockFile() (LockFile, error) {
-	if err := CheckModuleCollisions(r.packages); err != nil {
+	if err := CheckModules(r.packages); err != nil {
 		return LockFile{}, err
 	}
 	hash, err := ComputeHash(r.require, r.indexes, r.odooSeries)
@@ -392,6 +396,7 @@ func satisfies(constraint, v string) bool {
 func lockPackage(lookup index.AddonVersion, direct bool, deps, external []string) (LockedPackage, error) {
 	pkg := LockedPackage{
 		Version: lookup.Version,
+		Module:  name.ModuleName(lookup.Name),
 		Dist: Dist{
 			Type:      lookup.Type,
 			URL:       lookup.Repository,

@@ -78,7 +78,7 @@ func TestInstallAllReplacesPreviousInstall(t *testing.T) {
 	}
 
 	lock := lockfile.LockFile{Packages: map[string]lockfile.LockedPackage{
-		"new-addon": {Dist: dist},
+		"new-addon": {Module: "new_addon", Dist: dist},
 	}}
 	if err := installAll(m, lock, lockfile.LockFile{}); err != nil {
 		t.Fatal(err)
@@ -107,7 +107,7 @@ func TestInstallAllAdoptsLegacyInstall(t *testing.T) {
 	}
 
 	lock := lockfile.LockFile{Packages: map[string]lockfile.LockedPackage{
-		"new-addon": {Dist: dist},
+		"new-addon": {Module: "new_addon", Dist: dist},
 	}}
 	if err := installAll(m, lock, lockfile.LockFile{}); err != nil {
 		t.Fatal(err)
@@ -136,10 +136,10 @@ func TestInstallAllAdoptsLegacyInstallAfterResolvingAgain(t *testing.T) {
 	}
 
 	previous := lockfile.LockFile{Packages: map[string]lockfile.LockedPackage{
-		"dropped-addon": {Dist: dist},
+		"dropped-addon": {Module: "dropped_addon", Dist: dist},
 	}}
 	lock := lockfile.LockFile{Packages: map[string]lockfile.LockedPackage{
-		"new-addon": {Dist: dist},
+		"new-addon": {Module: "new_addon", Dist: dist},
 	}}
 	if err := installAll(m, lock, previous); err != nil {
 		t.Fatal(err)
@@ -208,7 +208,7 @@ func TestInstallRejectsInvalidLockfileName(t *testing.T) {
 
 	dir, out := installInChild(t, map[string]string{
 		"odoopack.json": `{"name":"test","odoo_series":"19.0","require":{"acme/health-check":"19.0"},"indexes":[],"addons_dir":"addons/odoopack"}`,
-		"odoopack.lock": `{"content_hash":"sha256:00","packages":{"../evil":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/x.git"}}}}`,
+		"odoopack.lock": `{"content_hash":"sha256:00","packages":{"../evil":{"version":"19.0.1.0.0","module":".._evil","dist":{"type":"git","url":"https://example.com/x.git"}}}}`,
 		filepath.Join("addons", "odoopack", addonsdir.MarkerName):                   "",
 		filepath.Join("addons", "odoopack", "acme_health_check", "__manifest__.py"): "{}",
 	})
@@ -229,7 +229,7 @@ func TestInstallRejectsModuleCollision(t *testing.T) {
 	// resolve again, clear addons_dir or download anything.
 	_, out := installInChild(t, map[string]string{
 		"odoopack.json": unreachableManifest,
-		"odoopack.lock": `{"content_hash":"sha256:00","packages":{"acme/health-check":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/x.git"}},"acme/health_check":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/y.git"}}}}`,
+		"odoopack.lock": `{"content_hash":"sha256:00","packages":{"acme/health-check":{"version":"19.0.1.0.0","module":"acme_health_check","dist":{"type":"git","url":"https://example.com/x.git"}},"acme/health_check":{"version":"19.0.1.0.0","module":"acme_health_check","dist":{"type":"git","url":"https://example.com/y.git"}}}}`,
 		filepath.Join("addons", "odoopack", addonsdir.MarkerName):                   "",
 		filepath.Join("addons", "odoopack", "acme_health_check", "__manifest__.py"): "{}",
 	}, "ODOOPACK_FROZEN_LOCKFILE=0")
@@ -247,7 +247,7 @@ func TestInstallRejectsNewerLockfileFormat(t *testing.T) {
 	// resolve again and overwrite the lockfile.
 	_, out := installInChild(t, map[string]string{
 		"odoopack.json": `{"name":"test","odoo_series":"19.0","require":{"acme/health-check":"19.0"},"indexes":[],"addons_dir":"addons/odoopack"}`,
-		"odoopack.lock": `{"format_version":2,"content_hash":"sha256:00","packages":{"acme/health-check":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/x.git"}}}}`,
+		"odoopack.lock": `{"format_version":2,"content_hash":"sha256:00","packages":{"acme/health-check":{"version":"19.0.1.0.0","module":"acme_health_check","dist":{"type":"git","url":"https://example.com/x.git"}}}}`,
 		filepath.Join("addons", "odoopack", addonsdir.MarkerName):                   "",
 		filepath.Join("addons", "odoopack", "acme_health_check", "__manifest__.py"): "{}",
 	})
@@ -261,7 +261,7 @@ func TestInstallRejectsNewerLockfileFormat(t *testing.T) {
 const unreachableManifest = `{"name":"test","odoo_series":"19.0","require":{"acme/health-check":"19.0"},"indexes":[{"name":"default","url":"http://127.0.0.1:1","type":"registry"}],"addons_dir":"addons/odoopack"}`
 
 // staleLockfile locks acme/health-check, but its content hash matches nothing.
-const staleLockfile = `{"format_version":1,"content_hash":"sha256:00","packages":{"acme/health-check":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/x.git"},"direct":true}}}`
+const staleLockfile = `{"format_version":1,"content_hash":"sha256:00","packages":{"acme/health-check":{"version":"19.0.1.0.0","module":"acme_health_check","dist":{"type":"git","url":"https://example.com/x.git"},"direct":true}}}`
 
 func TestInstallResolvesStaleLockfile(t *testing.T) {
 	if runInstallIfChild() {
