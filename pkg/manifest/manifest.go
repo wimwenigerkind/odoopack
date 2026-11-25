@@ -16,6 +16,10 @@ import (
 // configurable.
 const FileName = "odoopack.json"
 
+// DefaultAddonsDir is the addons_dir init writes unless the configuration
+// names another.
+const DefaultAddonsDir = "addons/odoopack"
+
 func Load() (*Manifest, error) {
 	exists, err := helper.FileExists(FileName)
 	if err != nil {
@@ -74,7 +78,11 @@ func Init(name, odoo string) (Manifest, error) {
 		return Manifest{}, fmt.Errorf("%s already exists", FileName)
 	}
 
-	manifest := NewManifest(name, viper.GetString("addons_dir"), odoo)
+	addonsDir := viper.GetString("addons_dir")
+	if addonsDir == "" {
+		addonsDir = DefaultAddonsDir
+	}
+	manifest := NewManifest(name, addonsDir, odoo)
 	if defaultURL := viper.GetString("default_index_url"); defaultURL != "" {
 		manifest.Indexes = append(manifest.Indexes, Index{Name: DefaultIndexName, Url: defaultURL, Type: "registry"})
 	}

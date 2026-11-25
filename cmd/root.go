@@ -27,6 +27,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/wimwenigerkind/odoopack/pkg/manifest"
 	"github.com/wimwenigerkind/odoopack/pkg/ui"
 )
 
@@ -49,7 +50,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.odoopack.yaml)")
 
 	viper.SetDefault("default_index_url", "https://odoopack.dev")
-	viper.SetDefault("addons_dir", "addons/odoopack")
+	viper.SetDefault("addons_dir", manifest.DefaultAddonsDir)
 
 	_ = viper.BindEnv("auth", "ODOOPACK_AUTH")
 	_ = viper.BindEnv("cache_dir", "ODOOPACK_CACHE_DIR")

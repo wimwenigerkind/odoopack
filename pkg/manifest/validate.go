@@ -20,6 +20,10 @@ var (
 	// seriesPattern spells a series like a version does: no leading zeros.
 	seriesPattern    = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
 	indexNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,63}$`)
+	// addonsDirPattern is a relative path with / as separator, of characters
+	// every file system takes, so the same manifest means the same directory
+	// on Linux, macOS and Windows: no backslash, no drive colon.
+	addonsDirPattern = regexp.MustCompile(`^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$`)
 )
 
 // Validate reports every problem of m at once, so that a manifest can be
@@ -37,6 +41,9 @@ func (m Manifest) Validate() error {
 		if err := ValidConstraint(constraint); err != nil {
 			errs = append(errs, fmt.Errorf("require %s: %w", pkg, err))
 		}
+	}
+	if err := ValidAddonsDir(m.AddonsDir); err != nil {
+		errs = append(errs, err)
 	}
 	if len(m.Extra) > 0 && m.Extra.Kind() != '{' {
 		errs = append(errs, errors.New("extra must be an object"))
@@ -61,6 +68,24 @@ func ValidSeries(series string) error {
 	}
 	if !seriesPattern.MatchString(series) {
 		return fmt.Errorf("odoo_series %q must be a series such as 19.0", series)
+	}
+	return nil
+}
+
+// ValidAddonsDir reports whether dir is a portable relative path inside the
+// project. Whether it stays inside the project through symlinks depends on
+// the file system, which addonsdir.Check looks at before anything is written.
+func ValidAddonsDir(dir string) error {
+	if dir == "" {
+		return errors.New(`addons_dir is not set; add "addons_dir": "addons/odoopack"`)
+	}
+	if !addonsDirPattern.MatchString(dir) {
+		return fmt.Errorf("addons_dir %q must be a relative path of letters, digits, '.', '_' and '-', with '/' as separator", dir)
+	}
+	for _, part := range strings.Split(dir, "/") {
+		if part == "." || part == ".." {
+			return fmt.Errorf("addons_dir %q must not contain %q", dir, part)
+		}
 	}
 	return nil
 }

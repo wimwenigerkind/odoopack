@@ -21,6 +21,7 @@ func TestValidateAcceptsValidManifest(t *testing.T) {
 	m.Require["acme/base-tools"] = "19.0.1.0.0"
 	m.Require["acme/wip"] = "dev-19.0"
 	m.Indexes = append(m.Indexes, Index{Name: "local_2", Url: "http://localhost:8080", Type: "registry"})
+	m.AddonsDir = "vendor/Odoo.addons/third_party-1"
 	if err := m.Validate(); err != nil {
 		t.Fatal(err)
 	}
@@ -45,6 +46,15 @@ func TestValidateRejects(t *testing.T) {
 		{"fragment", func(m *Manifest) { m.Indexes[0].Url = "https://registry.example.com#x" }, "query or fragment"},
 		{"scheme", func(m *Manifest) { m.Indexes[0].Url = "ftp://registry.example.com" }, "https://"},
 		{"no host", func(m *Manifest) { m.Indexes[0].Url = "https:///odoo" }, "has no host"},
+		{"addons_dir missing", func(m *Manifest) { m.AddonsDir = "" }, "addons_dir is not set"},
+		{"addons_dir backslash", func(m *Manifest) { m.AddonsDir = `addons\odoopack` }, "addons_dir"},
+		{"addons_dir absolute", func(m *Manifest) { m.AddonsDir = "/srv/addons" }, "addons_dir"},
+		{"addons_dir drive", func(m *Manifest) { m.AddonsDir = "C:/addons" }, "addons_dir"},
+		{"addons_dir parent", func(m *Manifest) { m.AddonsDir = "../addons" }, `must not contain ".."`},
+		{"addons_dir dot", func(m *Manifest) { m.AddonsDir = "." }, `must not contain "."`},
+		{"addons_dir inner dot", func(m *Manifest) { m.AddonsDir = "addons/./odoopack" }, `must not contain "."`},
+		{"addons_dir trailing slash", func(m *Manifest) { m.AddonsDir = "addons/" }, "addons_dir"},
+		{"addons_dir space", func(m *Manifest) { m.AddonsDir = "my addons" }, "addons_dir"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
