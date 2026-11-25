@@ -247,7 +247,7 @@ func TestLoadRejectsDuplicateKeys(t *testing.T) {
 func TestComputeHashIsCanonical(t *testing.T) {
 	require := map[string]string{"acme/health-check": "19.0", "acme/base-tools": "19.0.1.0.0"}
 	indexes := manifest.Indexes{
-		{Name: "public", Url: "https://ODOOPACK.example.com/", Type: "registry"},
+		{Name: "public", Url: "https://odoopack.example.com", Type: "registry"},
 		{Name: "company", Url: "https://registry.example.com", Type: "registry"},
 	}
 	canonical := `{"indexes":[{"type":"registry","url":"https://odoopack.example.com"},{"type":"registry","url":"https://registry.example.com"}],"odoo_series":"19.0","require":{"acme/base-tools":"19.0.1.0.0","acme/health-check":"19.0"}}`

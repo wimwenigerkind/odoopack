@@ -46,7 +46,7 @@ The lockfile pins the exact distribution of every requirement so that installs a
 | `direct` | boolean | `true` when `odoopack.json` requires the package, `false` when it is only a dependency of another package. |
 | `depends` | array | Packages this package depends on. They are locked too. |
 | `external_modules` | array | Module names this package depends on that no index provides, such as the modules that ship with Odoo. |
-| `index_url` | string | URL of the index the package was resolved from, the built-in default registry included, with scheme and host in lower case and no trailing slash. Later resolutions ask this index only, as long as the manifest has an index with this URL, whatever its name. A package without it is resolved as if it were new. |
+| `index_url` | string | URL of the index the package was resolved from, exactly as the manifest writes it. Later resolutions ask this index only, as long as the manifest has an index with this URL, whatever its name. A package without it is resolved as if it were new. |
 
 ## Unknown keys
 
@@ -78,7 +78,7 @@ Nothing is written when resolution fails. Dependencies carry only the series for
 1. Take this JSON object from the manifest:
    - `odoo_series`: the string as written.
    - `require`: the object as written.
-   - `indexes`: an array with one object `{"type": ..., "url": ...}` per index, the URL with scheme and host in lower case and without a trailing slash, sorted by `url` and then by `type`.
+   - `indexes`: an array with one object `{"type": ..., "url": ...}` per index, the URL exactly as the manifest writes it, sorted by `url` and then by `type`. The manifest only takes the [canonical form](manifest.md#indexes) of a URL, so there is nothing to normalize.
 2. Serialize it in the canonical form of [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785) (JSON Canonicalization Scheme).
 3. Take the SHA-256 of those bytes and write it as `sha256:` followed by the lowercase hex digest.
 

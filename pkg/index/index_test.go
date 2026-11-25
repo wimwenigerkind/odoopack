@@ -189,7 +189,7 @@ func TestLookupLockedFindsRenamedIndexByURL(t *testing.T) {
 	second, _ := registry(t, serving)
 	indexes := manifest.Indexes{
 		{Name: "a", Url: first, Type: "registry"},
-		{Name: "renamed", Url: second + "/", Type: "registry"},
+		{Name: "renamed", Url: second, Type: "registry"},
 	}
 
 	got, err := LookupLocked(indexes, second, "acme/health-check", "19.0", "19.0")
@@ -198,19 +198,6 @@ func TestLookupLockedFindsRenamedIndexByURL(t *testing.T) {
 	}
 	if got.Registry != second || firstHits.Load() != 0 {
 		t.Fatalf("resolved from %q with %d request(s) to a, want the renamed index only", got.Registry, firstHits.Load())
-	}
-}
-
-func TestNormalizeURL(t *testing.T) {
-	for raw, want := range map[string]string{
-		"https://Registry.Example.com/":      "https://registry.example.com",
-		"HTTPS://registry.example.com/odoo/": "https://registry.example.com/odoo",
-		"https://registry.example.com":       "https://registry.example.com",
-		"http://localhost:8080//":            "http://localhost:8080",
-	} {
-		if got := NormalizeURL(raw); got != want {
-			t.Errorf("NormalizeURL(%q) = %q, want %q", raw, got, want)
-		}
 	}
 }
 

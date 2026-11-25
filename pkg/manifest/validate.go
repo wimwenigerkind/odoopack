@@ -48,15 +48,22 @@ func (m Manifest) Validate() error {
 	if len(m.Extra) > 0 && m.Extra.Kind() != '{' {
 		errs = append(errs, errors.New("extra must be an object"))
 	}
-	seen := make(map[string]bool, len(m.Indexes))
+	names := make(map[string]bool, len(m.Indexes))
+	urls := make(map[string]string, len(m.Indexes))
 	for _, idx := range m.Indexes {
 		if err := idx.Validate(); err != nil {
 			errs = append(errs, err)
 		}
-		if seen[idx.Name] {
+		if names[idx.Name] {
 			errs = append(errs, fmt.Errorf("index name %q is used twice", idx.Name))
 		}
-		seen[idx.Name] = true
+		names[idx.Name] = true
+		// A package is locked to the URL of its index, so two indexes with
+		// one URL would be one index under two names.
+		if other, ok := urls[idx.Url]; ok {
+			errs = append(errs, fmt.Errorf("indexes %s and %s have the same url %s", other, idx.Name, idx.Url))
+		}
+		urls[idx.Url] = idx.Name
 	}
 	return errors.Join(errs...)
 }
@@ -132,8 +139,41 @@ func ValidIndexURL(raw string) error {
 		return fmt.Errorf("url %q must not contain credentials; put the token in ODOOPACK_AUTH", redact(u))
 	case u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || strings.Contains(raw, "#"):
 		return fmt.Errorf("url %q must not have a query or fragment", raw)
+	case strings.Contains(raw, "%"):
+		return fmt.Errorf("url %q must not contain percent escapes", raw)
+	}
+	if canonical := CanonicalURL(raw); raw != canonical {
+		return fmt.Errorf("url %q must be written as %q", raw, canonical)
 	}
 	return nil
+}
+
+// CanonicalURL is the one spelling of an index URL the manifest takes:
+// scheme and host in lower case, no default port and no trailing slash.
+// content_hash and index_url use the URL as written, so two spellings of
+// one registry must not exist, and a tool other than odoopack must not need
+// rules of its own to compare them.
+func CanonicalURL(raw string) string {
+	u, err := url.Parse(raw)
+	// Decoding an escape would change the path, a%2Fb into a/b, so a URL
+	// with one stays as it is and ValidIndexURL refuses it.
+	if err != nil || u.Host == "" || strings.Contains(raw, "%") {
+		return raw
+	}
+	u.Scheme = strings.ToLower(u.Scheme)
+	host := strings.ToLower(u.Hostname())
+	if strings.Contains(host, ":") {
+		host = "[" + host + "]"
+	}
+	switch port := u.Port(); {
+	case port == "", u.Scheme == "https" && port == "443", u.Scheme == "http" && port == "80":
+		u.Host = host
+	default:
+		u.Host = host + ":" + port
+	}
+	u.Path = strings.TrimRight(u.Path, "/")
+	u.RawPath = ""
+	return u.String()
 }
 
 // redact keeps credentials out of the error, which may end up in a CI log.

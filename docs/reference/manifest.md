@@ -46,7 +46,7 @@ The manifest describes your project: which addons it requires and which registri
 | Field | Type | Description |
 | --- | --- | --- |
 | `name` | string | Unique name of the index, 1 to 64 lowercase letters, digits, `_` and `-`, starting with a letter or digit. Used in messages and by the `index` command. Resolution does not depend on it: a package is locked to the URL of its index. `default` has no special meaning. |
-| `url` | string | Registry base URL: `https://` or `http://`, a host and an optional path. Credentials, a query and a fragment are refused; tokens belong in `ODOOPACK_AUTH`, see [Private registries](../guides/private-registries.md). |
+| `url` | string | Registry base URL: `https://` or `http://`, a host and an optional path, in its one canonical form: scheme and host in lower case, no default port (`:443`, `:80`), no trailing `/` and no percent escapes. Two indexes must not have the same URL. Credentials, a query and a fragment are refused; tokens belong in `ODOOPACK_AUTH`, see [Private registries](../guides/private-registries.md). |
 | `type` | string | Index type. `registry` is currently the only type. An unknown type is refused with a request to upgrade odoopack, instead of skipping the index and resolving the addon elsewhere. |
 
 Indexes are tried in their order during resolution, and only an index that does not have the addon passes it on to the next one. Put a private registry before a public one, so that a name both have resolves to the private addon. See [index](../commands/index-command.md#resolution-order).

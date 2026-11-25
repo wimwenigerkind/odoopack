@@ -34,7 +34,7 @@ is.`,
 		name := args[0]
 		raw := args[1]
 
-		idx := manifest.Index{Name: name, Url: raw, Type: indexAddType}
+		idx := manifest.Index{Name: name, Url: manifest.CanonicalURL(raw), Type: indexAddType}
 		if err := idx.Validate(); err != nil {
 			fatal(err)
 		}
@@ -47,7 +47,7 @@ is.`,
 		if err := manifest.Save(*m); err != nil {
 			fatal(err)
 		}
-		ui.Success("added index %s %s (%s)", name, raw, indexAddType)
+		ui.Success("added index %s %s (%s)", name, idx.Url, indexAddType)
 	},
 }
 

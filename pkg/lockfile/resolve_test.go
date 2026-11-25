@@ -359,7 +359,7 @@ func TestRenamedIndexKeepsLockfile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	renamed := manifest.Indexes{{Name: "company", Url: indexes[0].Url + "/", Type: "registry"}}
+	renamed := manifest.Indexes{{Name: "company", Url: indexes[0].Url, Type: "registry"}}
 	if stale, err := IsStale(require, renamed, "19.0", lf.Packages, lf.ContentHash); err != nil || stale {
 		t.Fatalf("renaming the index made the lockfile stale (%v, %v)", stale, err)
 	}

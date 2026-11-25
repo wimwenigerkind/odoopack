@@ -145,7 +145,7 @@ type hashedIndex struct {
 func hashedIndexes(indexes manifest.Indexes) []hashedIndex {
 	list := make([]hashedIndex, 0, len(indexes))
 	for _, idx := range indexes {
-		list = append(list, hashedIndex{Url: index.NormalizeURL(idx.Url), Type: idx.Type})
+		list = append(list, hashedIndex{Url: idx.Url, Type: idx.Type})
 	}
 	sort.Slice(list, func(i, j int) bool {
 		if list[i].Url != list[j].Url {
