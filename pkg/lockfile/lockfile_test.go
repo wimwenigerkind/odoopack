@@ -55,20 +55,29 @@ func useLock(t *testing.T, content string) string {
 	return path
 }
 
-func TestLoadWithoutFormatIsFormatOne(t *testing.T) {
+func TestLoadWithoutFormatVersionIsOne(t *testing.T) {
 	useLock(t, `{"content_hash":"sha256:00","packages":{}}`)
 
 	lf, err := Load()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if lf.Format != 1 {
-		t.Fatalf("got format %d, want 1", lf.Format)
+	if lf.FormatVersion != 1 {
+		t.Fatalf("got format_version %d, want 1", lf.FormatVersion)
 	}
 }
 
-func TestLoadRejectsNewerFormat(t *testing.T) {
-	path := useLock(t, fmt.Sprintf(`{"format":%d,"content_hash":"sha256:00","packages":{}}`, Format+1))
+func TestLoadReadsLegacyFormat(t *testing.T) {
+	path := useLock(t, fmt.Sprintf(`{"format":%d,"content_hash":"sha256:00","packages":{}}`, FormatVersion+1))
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), path) || !strings.Contains(err.Error(), "upgrade odoopack") {
+		t.Fatalf("got error %v, want the legacy format key to be checked like format_version", err)
+	}
+}
+
+func TestLoadRejectsNewerFormatVersion(t *testing.T) {
+	path := useLock(t, fmt.Sprintf(`{"format_version":%d,"content_hash":"sha256:00","packages":{}}`, FormatVersion+1))
 
 	_, err := Load()
 	if err == nil || !strings.Contains(err.Error(), path) || !strings.Contains(err.Error(), "upgrade odoopack") {
@@ -76,18 +85,25 @@ func TestLoadRejectsNewerFormat(t *testing.T) {
 	}
 }
 
-func TestSaveWritesFormatFirst(t *testing.T) {
-	path := useLock(t, "")
+func TestSaveWritesFormatVersionFirst(t *testing.T) {
+	path := useLock(t, `{"format":1,"content_hash":"sha256:00","packages":{}}`)
 
-	if err := Save(LockFile{Packages: map[string]LockedPackage{}}); err != nil {
+	lf, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Save(lf); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := fmt.Sprintf("{\n  \"format\": %d,\n", Format); !bytes.HasPrefix(data, []byte(want)) {
+	if want := fmt.Sprintf("{\n  \"format_version\": %d,\n", FormatVersion); !bytes.HasPrefix(data, []byte(want)) {
 		t.Fatalf("lockfile does not start with %q:\n%s", want, data)
+	}
+	if bytes.Contains(data, []byte(`"format":`)) {
+		t.Fatalf("lockfile still has the legacy format key:\n%s", data)
 	}
 }
 

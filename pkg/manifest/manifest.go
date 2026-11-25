@@ -28,6 +28,10 @@ func Load() (*Manifest, error) {
 	if err := json.Unmarshal(data, &manifest); err != nil {
 		return nil, err
 	}
+	manifest.FormatVersion, err = helper.CheckFormatVersion(viper.GetString("manifest"), manifest.FormatVersion, FormatVersion)
+	if err != nil {
+		return nil, err
+	}
 	for pkg := range manifest.Require {
 		if err := name.ValidPackage(pkg); err != nil {
 			return nil, fmt.Errorf("%s: %w", viper.GetString("manifest"), err)
@@ -38,6 +42,7 @@ func Load() (*Manifest, error) {
 }
 
 func Save(manifest Manifest) error {
+	manifest.FormatVersion = FormatVersion
 	data, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
 		return err
