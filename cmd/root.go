@@ -50,8 +50,6 @@ func init() {
 
 	viper.SetDefault("default_index_url", "https://odoopack.dev")
 	viper.SetDefault("addons_dir", "addons/odoopack")
-	viper.SetDefault("manifest", "odoopack.json")
-	viper.SetDefault("lock", "odoopack.lock")
 
 	_ = viper.BindEnv("auth", "ODOOPACK_AUTH")
 	_ = viper.BindEnv("cache_dir", "ODOOPACK_CACHE_DIR")

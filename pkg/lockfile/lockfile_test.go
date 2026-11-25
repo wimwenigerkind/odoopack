@@ -17,7 +17,7 @@ import (
 )
 
 func TestLoadOrNewWithoutLockfile(t *testing.T) {
-	viper.Set("lock", filepath.Join(t.TempDir(), "odoopack.lock"))
+	t.Chdir(t.TempDir())
 	t.Cleanup(viper.Reset)
 
 	lf, err := LoadOrNew()
@@ -30,15 +30,16 @@ func TestLoadOrNewWithoutLockfile(t *testing.T) {
 }
 
 func TestLoadOrNewRejectsInvalidName(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "odoopack.lock")
-	viper.Set("lock", path)
+	dir := t.TempDir()
+	t.Chdir(dir)
+	path := filepath.Join(dir, FileName)
 	t.Cleanup(viper.Reset)
 	if err := os.WriteFile(path, []byte(`{"packages":{"../evil":{"version":"19.0.1.0.0","module":".._evil","dist":{"type":"git","url":"https://example.com/x.git"}}}}`), 0644); err != nil {
 		t.Fatal(err)
 	}
 
 	_, err := LoadOrNew()
-	if err == nil || !strings.Contains(err.Error(), path) || !strings.Contains(err.Error(), "../evil") {
+	if err == nil || !strings.Contains(err.Error(), FileName) || !strings.Contains(err.Error(), "../evil") {
 		t.Fatalf("got error %v, want one naming %s and the invalid name", err, path)
 	}
 }
@@ -47,8 +48,9 @@ func TestLoadOrNewRejectsInvalidName(t *testing.T) {
 // holds content.
 func useLock(t *testing.T, content string) string {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "odoopack.lock")
-	viper.Set("lock", path)
+	dir := t.TempDir()
+	t.Chdir(dir)
+	path := filepath.Join(dir, FileName)
 	t.Cleanup(viper.Reset)
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		t.Fatal(err)
@@ -72,7 +74,7 @@ func TestLoadRejectsNewerFormatVersion(t *testing.T) {
 	path := useLock(t, fmt.Sprintf(`{"format_version":%d,"content_hash":"sha256:00","packages":{}}`, FormatVersion+1))
 
 	_, err := Load()
-	if err == nil || !strings.Contains(err.Error(), path) || !strings.Contains(err.Error(), "upgrade odoopack") {
+	if err == nil || !strings.Contains(err.Error(), FileName) || !strings.Contains(err.Error(), "upgrade odoopack") {
 		t.Fatalf("got error %v, want one naming %s and asking to upgrade", err, path)
 	}
 }
@@ -217,7 +219,7 @@ func TestLoadRejectsModuleCollision(t *testing.T) {
 	path := useLock(t, `{"content_hash":"sha256:00","packages":{"acme/a-b":{"version":"19.0.1.0.0","module":"acme_a_b","dist":{"type":"git","url":"https://example.com/x.git"}},"acme/a_b":{"version":"19.0.1.0.0","module":"acme_a_b","dist":{"type":"git","url":"https://example.com/y.git"}}}}`)
 
 	_, err := Load()
-	if err == nil || !strings.Contains(err.Error(), path) || !strings.Contains(err.Error(), "acme/a-b and acme/a_b") {
+	if err == nil || !strings.Contains(err.Error(), FileName) || !strings.Contains(err.Error(), "acme/a-b and acme/a_b") {
 		t.Fatalf("got error %v, want one naming %s and both packages", err, path)
 	}
 }

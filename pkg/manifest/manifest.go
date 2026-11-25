@@ -11,25 +11,30 @@ import (
 	"github.com/wimwenigerkind/odoopack/pkg/ui"
 )
 
+// FileName is the manifest of the project in the working directory. It is
+// part of the format, like Composer's composer.json, so it is not
+// configurable.
+const FileName = "odoopack.json"
+
 func Load() (*Manifest, error) {
-	exists, err := helper.FileExists(viper.GetString("manifest"))
+	exists, err := helper.FileExists(FileName)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		return nil, fmt.Errorf("%s not found, run 'odoopack init' first", viper.GetString("manifest"))
+		return nil, fmt.Errorf("%s not found, run 'odoopack init' first", FileName)
 	}
 
-	data, err := os.ReadFile(viper.GetString("manifest"))
+	data, err := os.ReadFile(FileName)
 	if err != nil {
 		return nil, err
 	}
 
 	var manifest Manifest
 	if err := json.Unmarshal(data, &manifest); err != nil {
-		return nil, fmt.Errorf("%s: %w", viper.GetString("manifest"), err)
+		return nil, fmt.Errorf("%s: %w", FileName, err)
 	}
-	manifest.FormatVersion, err = helper.CheckFormatVersion(viper.GetString("manifest"), manifest.FormatVersion, FormatVersion)
+	manifest.FormatVersion, err = helper.CheckFormatVersion(FileName, manifest.FormatVersion, FormatVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -37,10 +42,10 @@ func Load() (*Manifest, error) {
 	// write by this one. The warning catches a misspelt key, which would
 	// otherwise be ignored silently.
 	for _, key := range manifest.UnknownKeys() {
-		ui.Warn("%s: unknown key %q is kept but ignored by this odoopack", viper.GetString("manifest"), key)
+		ui.Warn("%s: unknown key %q is kept but ignored by this odoopack", FileName, key)
 	}
 	if err := manifest.Validate(); err != nil {
-		return nil, fmt.Errorf("%s: %w", viper.GetString("manifest"), err)
+		return nil, fmt.Errorf("%s: %w", FileName, err)
 	}
 
 	return &manifest, nil
@@ -51,22 +56,22 @@ func Save(manifest Manifest) error {
 	// A command validates its input before it changes anything; this keeps a
 	// mistake in one from writing a manifest no odoopack would load again.
 	if err := manifest.Validate(); err != nil {
-		return fmt.Errorf("refusing to write %s: %w", viper.GetString("manifest"), err)
+		return fmt.Errorf("refusing to write %s: %w", FileName, err)
 	}
 	data, err := json.Marshal(manifest, jsontext.WithIndent("  "), json.Deterministic(true))
 	if err != nil {
 		return err
 	}
-	return helper.WriteJSONFile(viper.GetString("manifest"), data)
+	return helper.WriteJSONFile(FileName, data)
 }
 
 func Init(name, odoo string) (Manifest, error) {
-	exists, err := helper.FileExists(viper.GetString("manifest"))
+	exists, err := helper.FileExists(FileName)
 	if err != nil {
 		return Manifest{}, err
 	}
 	if exists {
-		return Manifest{}, fmt.Errorf("%s already exists", viper.GetString("manifest"))
+		return Manifest{}, fmt.Errorf("%s already exists", FileName)
 	}
 
 	manifest := NewManifest(name, viper.GetString("addons_dir"), odoo)
