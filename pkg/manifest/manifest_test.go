@@ -12,15 +12,16 @@ import (
 )
 
 func TestLoadRejectsInvalidName(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "odoopack.json")
-	viper.Set("manifest", path)
+	dir := t.TempDir()
+	t.Chdir(dir)
+	path := filepath.Join(dir, FileName)
 	t.Cleanup(viper.Reset)
 	if err := os.WriteFile(path, []byte(`{"name":"test","odoo_series":"19.0","require":{"acme/../evil":"19.0"},"addons_dir":"addons/odoopack"}`), 0644); err != nil {
 		t.Fatal(err)
 	}
 
 	_, err := Load()
-	if err == nil || !strings.Contains(err.Error(), path) || !strings.Contains(err.Error(), "acme/../evil") {
+	if err == nil || !strings.Contains(err.Error(), FileName) || !strings.Contains(err.Error(), "acme/../evil") {
 		t.Fatalf("got error %v, want one naming %s and the invalid name", err, path)
 	}
 }
@@ -29,8 +30,9 @@ func TestLoadRejectsInvalidName(t *testing.T) {
 // directory that holds content.
 func useManifest(t *testing.T, content string) string {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "odoopack.json")
-	viper.Set("manifest", path)
+	dir := t.TempDir()
+	t.Chdir(dir)
+	path := filepath.Join(dir, FileName)
 	t.Cleanup(viper.Reset)
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		t.Fatal(err)
@@ -54,7 +56,7 @@ func TestLoadRejectsNewerFormatVersion(t *testing.T) {
 	path := useManifest(t, fmt.Sprintf(`{"format_version":%d,"name":"test","odoo_series":"19.0","addons_dir":"addons/odoopack"}`, FormatVersion+1))
 
 	_, err := Load()
-	if err == nil || !strings.Contains(err.Error(), path) || !strings.Contains(err.Error(), "upgrade odoopack") {
+	if err == nil || !strings.Contains(err.Error(), FileName) || !strings.Contains(err.Error(), "upgrade odoopack") {
 		t.Fatalf("got error %v, want one naming %s and asking to upgrade", err, path)
 	}
 }

@@ -10,7 +10,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/spf13/viper"
 	"github.com/wimwenigerkind/odoopack-spec/digest"
 	"github.com/wimwenigerkind/odoopack-spec/name"
 	"github.com/wimwenigerkind/odoopack-spec/version"
@@ -20,10 +19,14 @@ import (
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
 )
 
+// FileName is the lockfile next to the manifest. It is part of the format,
+// so it is not configurable.
+const FileName = "odoopack.lock"
+
 // LoadOrNew returns an empty lockfile when none exists. Any other problem is
 // an error, so that a lockfile with an invalid name is not silently replaced.
 func LoadOrNew() (LockFile, error) {
-	exists, err := helper.FileExists(viper.GetString("lock"))
+	exists, err := helper.FileExists(FileName)
 	if err != nil {
 		return LockFile{}, err
 	}
@@ -41,34 +44,34 @@ func LoadOrNew() (LockFile, error) {
 }
 
 func Load() (LockFile, error) {
-	exists, err := helper.FileExists(viper.GetString("lock"))
+	exists, err := helper.FileExists(FileName)
 	if err != nil {
 		return LockFile{}, err
 	}
 	if !exists {
-		return LockFile{}, fmt.Errorf("%s not found", viper.GetString("lock"))
+		return LockFile{}, fmt.Errorf("%s not found", FileName)
 	}
 
-	data, err := os.ReadFile(viper.GetString("lock"))
+	data, err := os.ReadFile(FileName)
 	if err != nil {
 		return LockFile{}, err
 	}
 
 	var lockFile LockFile
 	if err := json.Unmarshal(data, &lockFile); err != nil {
-		return LockFile{}, fmt.Errorf("%s: %w", viper.GetString("lock"), err)
+		return LockFile{}, fmt.Errorf("%s: %w", FileName, err)
 	}
-	lockFile.FormatVersion, err = helper.CheckFormatVersion(viper.GetString("lock"), lockFile.FormatVersion, FormatVersion)
+	lockFile.FormatVersion, err = helper.CheckFormatVersion(FileName, lockFile.FormatVersion, FormatVersion)
 	if err != nil {
 		return LockFile{}, err
 	}
 	for pkg := range lockFile.Packages {
 		if err := name.ValidPackage(pkg); err != nil {
-			return LockFile{}, fmt.Errorf("%s: %w", viper.GetString("lock"), err)
+			return LockFile{}, fmt.Errorf("%s: %w", FileName, err)
 		}
 	}
 	if err := CheckModules(lockFile.Packages); err != nil {
-		return LockFile{}, fmt.Errorf("%s: %w", viper.GetString("lock"), err)
+		return LockFile{}, fmt.Errorf("%s: %w", FileName, err)
 	}
 
 	return lockFile, nil
@@ -105,7 +108,7 @@ func Save(lockFile LockFile) error {
 	if err != nil {
 		return err
 	}
-	return helper.WriteJSONFile(viper.GetString("lock"), data)
+	return helper.WriteJSONFile(FileName, data)
 }
 
 // ComputeHash covers what the manifest resolves the packages from, so that

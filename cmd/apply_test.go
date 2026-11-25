@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"github.com/wimwenigerkind/odoopack-spec/name"
 	"github.com/wimwenigerkind/odoopack-spec/registryapi"
 	"github.com/wimwenigerkind/odoopack/pkg/addonsdir"
@@ -54,8 +53,6 @@ func lockedAt(pkg, indexURL string, dist lockfile.Dist, version string, direct b
 func project(t *testing.T, m *manifest.Manifest, packages map[string]lockfile.LockedPackage) {
 	t.Helper()
 	t.Chdir(t.TempDir())
-	viper.Set("manifest", "odoopack.json")
-	viper.Set("lock", "odoopack.lock")
 	if err := manifest.Save(*m); err != nil {
 		t.Fatal(err)
 	}

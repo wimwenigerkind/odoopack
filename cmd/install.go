@@ -70,7 +70,7 @@ var installCmd = &cobra.Command{
 
 func frozenLockfileError() error {
 	const fix = "run 'odoopack install' without --frozen-lockfile (or 'odoopack update') and commit the lockfile"
-	path := viper.GetString("lock")
+	path := lockfile.FileName
 	exists, err := helper.FileExists(path)
 	if err != nil {
 		return err
@@ -78,7 +78,7 @@ func frozenLockfileError() error {
 	if !exists {
 		return fmt.Errorf("%s not found; %s", path, fix)
 	}
-	return fmt.Errorf("%s is out of date with %s; %s", path, viper.GetString("manifest"), fix)
+	return fmt.Errorf("%s is out of date with %s; %s", path, manifest.FileName, fix)
 }
 
 // installAll replaces addons_dir with the packages in lock. previous is the
