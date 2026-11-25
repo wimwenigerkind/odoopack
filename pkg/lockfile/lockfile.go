@@ -188,8 +188,8 @@ func hashedIndexes(indexes manifest.Indexes) []hashedIndex {
 // name and with the URL as written.
 func namedIndexes(indexes manifest.Indexes) map[string]hashedIndex {
 	named := make(map[string]hashedIndex, len(indexes))
-	for name, idx := range indexes {
-		named[name] = hashedIndex{Url: idx.Url, Type: idx.Type}
+	for _, idx := range indexes {
+		named[idx.Name] = hashedIndex{Url: idx.Url, Type: idx.Type}
 	}
 	return named
 }

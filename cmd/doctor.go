@@ -55,16 +55,16 @@ var doctorCmd = &cobra.Command{
 		}
 
 		if len(m.Indexes) == 0 {
-			warn("no indexes configured (relying on the default index if set)")
+			warn("no indexes configured, so no addon can be resolved")
 		} else {
 			ok("%d index(es) configured", len(m.Indexes))
 		}
-		for name, idx := range m.Indexes {
+		for _, idx := range m.Indexes {
 			if idx.Url == "" {
-				bad("index %q has no url", name)
+				bad("index %q has no url", idx.Name)
 			}
 			if idx.Type == "" {
-				warn("index %q has no type", name)
+				warn("index %q has no type", idx.Name)
 			}
 		}
 

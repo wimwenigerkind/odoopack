@@ -51,11 +51,10 @@ func addon(name string, depends ...string) registryapi.Addon {
 func TestRecomputeHashRecordsIndex(t *testing.T) {
 	first, _ := registry(t, addon("acme/health-check", "acme/base-tools"))
 	second, _ := registry(t, addon("acme/base-tools"))
-	viper.Set("default_index_url", "")
 	t.Cleanup(viper.Reset)
 	indexes := manifest.Indexes{
-		"a": {Url: first, Type: "registry"},
-		"b": {Url: second, Type: "registry"},
+		{Name: "a", Url: first, Type: "registry"},
+		{Name: "b", Url: second, Type: "registry"},
 	}
 
 	lf, err := RecomputeHash(map[string]string{"acme/health-check": "19.0"}, indexes, "19.0", nil)
@@ -70,28 +69,27 @@ func TestRecomputeHashRecordsIndex(t *testing.T) {
 	}
 }
 
-func TestRecomputeHashRecordsImplicitDefault(t *testing.T) {
-	public, _ := registry(t, addon("acme/health-check"))
+func TestRecomputeHashHasNoImplicitDefault(t *testing.T) {
+	public, hits := registry(t, addon("acme/health-check"))
 	viper.Set("default_index_url", public)
 	t.Cleanup(viper.Reset)
 
-	lf, err := RecomputeHash(map[string]string{"acme/health-check": "19.0"}, nil, "19.0", nil)
-	if err != nil {
-		t.Fatal(err)
+	_, err := RecomputeHash(map[string]string{"acme/health-check": "19.0"}, nil, "19.0", nil)
+	if err == nil || !strings.Contains(err.Error(), "no indexes configured") {
+		t.Fatalf("got error %v, want one about no indexes", err)
 	}
-	if got := lf.Packages["acme/health-check"].IndexURL; got != public {
-		t.Fatalf("locked to %q, want the default index %s", got, public)
+	if n := hits.Load(); n != 0 {
+		t.Fatalf("the default registry got %d request(s) although the manifest does not list it", n)
 	}
 }
 
 func TestRecomputeHashResolvesLockedFromItsIndex(t *testing.T) {
 	first, firstHits := registry(t, addon("acme/health-check", "acme/base-tools"), addon("acme/base-tools"))
 	second, _ := registry(t, addon("acme/health-check", "acme/base-tools"), addon("acme/base-tools"))
-	viper.Set("default_index_url", "")
 	t.Cleanup(viper.Reset)
 	indexes := manifest.Indexes{
-		"a": {Url: first, Type: "registry"},
-		"b": {Url: second, Type: "registry"},
+		{Name: "a", Url: first, Type: "registry"},
+		{Name: "b", Url: second, Type: "registry"},
 	}
 	locked := map[string]LockedPackage{
 		"acme/health-check": {Index: "b"},
@@ -115,10 +113,9 @@ func TestRecomputeHashResolvesLockedFromItsIndex(t *testing.T) {
 func TestRecomputeHashWithLockfileWithoutIndex(t *testing.T) {
 	first, _ := registry(t)
 	second, _ := registry(t, addon("acme/health-check"))
-	viper.Set("default_index_url", "")
 	indexes := manifest.Indexes{
-		"a": {Url: first, Type: "registry"},
-		"b": {Url: second, Type: "registry"},
+		{Name: "a", Url: first, Type: "registry"},
+		{Name: "b", Url: second, Type: "registry"},
 	}
 	useLock(t, `{"content_hash":"sha256:00","packages":{"acme/health-check":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/x.git"},"direct":true}}}`)
 	old, err := Load()
@@ -137,7 +134,7 @@ func TestRecomputeHashWithLockfileWithoutIndex(t *testing.T) {
 
 func TestLockfileWithoutIndexKeepsContentHash(t *testing.T) {
 	require := map[string]string{"acme/health-check": "19.0"}
-	indexes := manifest.Indexes{"company": {Url: "https://registry.example.com", Type: "registry"}}
+	indexes := manifest.Indexes{{Name: "company", Url: "https://registry.example.com", Type: "registry"}}
 	packages := map[string]LockedPackage{
 		"acme/health-check": {Version: "19.0.1.0.0", Dist: Dist{Type: "git", URL: "https://example.com/x.git"}, Direct: true},
 	}
@@ -187,9 +184,8 @@ func locked(version string, direct bool, depends ...string) LockedPackage {
 func singleIndex(t *testing.T, addons ...registryapi.Addon) (manifest.Indexes, *atomic.Int32) {
 	t.Helper()
 	url, hits := registry(t, addons...)
-	viper.Set("default_index_url", "")
 	t.Cleanup(viper.Reset)
-	return manifest.Indexes{"a": {Url: url, Type: "registry"}}, hits
+	return manifest.Indexes{{Name: "a", Url: url, Type: "registry"}}, hits
 }
 
 func TestUpdateResolvesTreeAndKeepsOthers(t *testing.T) {
@@ -216,7 +212,7 @@ func TestUpdateResolvesTreeAndKeepsOthers(t *testing.T) {
 		t.Fatal(err)
 	}
 	hc := lf.Packages["acme/health-check"]
-	if hc.Version != "19.0.2.0.0" || !hc.Direct || hc.IndexURL != indexes["a"].Url || strings.Join(hc.Depends, ",") != "acme/base-tools,acme/shared" {
+	if hc.Version != "19.0.2.0.0" || !hc.Direct || hc.IndexURL != indexes[0].Url || strings.Join(hc.Depends, ",") != "acme/base-tools,acme/shared" {
 		t.Errorf("acme/health-check locked as %+v", hc)
 	}
 	if bt, ok := lf.Packages["acme/base-tools"]; !ok || bt.Direct {
@@ -351,10 +347,10 @@ func TestSatisfies(t *testing.T) {
 	}
 }
 
-func TestRelockKeepsPackageFromImplicitDefault(t *testing.T) {
+func TestRelockKeepsPackageFromLastIndex(t *testing.T) {
 	indexes, hits := singleIndex(t)
 	public, publicHits := registry(t)
-	viper.Set("default_index_url", public)
+	indexes = append(indexes, manifest.Index{Name: manifest.DefaultIndexName, Url: public, Type: "registry"})
 
 	fromDefault := locked("19.0.1.0.0", true)
 	fromDefault.Index = ""
@@ -366,10 +362,10 @@ func TestRelockKeepsPackageFromImplicitDefault(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got := lf.Packages["acme/public-tools"]; got.IndexURL != public || got.Version != "19.0.1.0.0" {
-		t.Errorf("locked %+v, want the package kept from the default index", got)
+		t.Errorf("locked %+v, want the package kept from the last index", got)
 	}
 	if n := hits.Load() + publicHits.Load(); n != 0 {
-		t.Errorf("relocking a package from the default index sent %d request(s)", n)
+		t.Errorf("relocking a package from the last index sent %d request(s)", n)
 	}
 }
 
@@ -394,7 +390,7 @@ func TestRenamedIndexKeepsLockfile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	renamed := manifest.Indexes{"company": {Url: indexes["a"].Url + "/", Type: "registry"}}
+	renamed := manifest.Indexes{{Name: "company", Url: indexes[0].Url + "/", Type: "registry"}}
 	if stale, err := IsStale(require, renamed, "19.0", lf.Packages, lf.ContentHash); err != nil || stale {
 		t.Fatalf("renaming the index made the lockfile stale (%v, %v)", stale, err)
 	}
@@ -429,8 +425,8 @@ func TestLockfileWithIndexNameIsWrittenBackWithRegistry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := lf.Packages["acme/health-check"]; got.IndexURL != indexes["a"].Url || got.Index != "" || got.Version != "19.0.1.0.0" {
-		t.Errorf("locked %+v, want the package kept with the URL of index a (%s)", got, indexes["a"].Url)
+	if got := lf.Packages["acme/health-check"]; got.IndexURL != indexes[0].Url || got.Index != "" || got.Version != "19.0.1.0.0" {
+		t.Errorf("locked %+v, want the package kept with the URL of index a (%s)", got, indexes[0].Url)
 	}
 	if n := hits.Load(); n != 0 {
 		t.Errorf("rewriting the index name sent %d request(s)", n)
@@ -448,8 +444,8 @@ func TestChangedRegistryURLResolvesAgain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := lf.Packages["acme/health-check"].IndexURL; got != indexes["a"].Url {
-		t.Errorf("locked to %q, want index a (%s)", got, indexes["a"].Url)
+	if got := lf.Packages["acme/health-check"].IndexURL; got != indexes[0].Url {
+		t.Errorf("locked to %q, want index a (%s)", got, indexes[0].Url)
 	}
 	if hits.Load() == 0 {
 		t.Error("a package locked to a registry no index points at was kept without asking index a")

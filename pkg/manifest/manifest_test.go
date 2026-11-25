@@ -116,7 +116,7 @@ func TestSaveKeepsUnknownKeys(t *testing.T) {
   "description": "kept",
   "odoo_series": "19.0",
   "require": {},
-  "indexes": {"company": {"priority": 10, "url": "https://registry.example.com", "type": "registry"}},
+  "indexes": [{"priority": 10, "name": "company", "url": "https://registry.example.com", "type": "registry"}],
   "addons_dir": "addons/odoopack",
   "extra": {"acme": {"team": "core"}}
 }`)
@@ -142,13 +142,14 @@ func TestSaveKeepsUnknownKeys(t *testing.T) {
   "name": "test",
   "odoo_series": "19.0",
   "require": {},
-  "indexes": {
-    "company": {
+  "indexes": [
+    {
+      "name": "company",
       "url": "https://registry.example.com",
       "type": "registry",
       "priority": 10
     }
-  },
+  ],
   "addons_dir": "addons/odoopack",
   "extra": {
     "acme": {

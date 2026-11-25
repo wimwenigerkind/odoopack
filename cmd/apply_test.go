@@ -111,7 +111,7 @@ func TestRequireInstallsChangedPackages(t *testing.T) {
 		registryapi.Addon{Name: "acme/other", Versions: []registryapi.Version{release(dist, "19.0.1.0.0")}},
 	)
 	m := manifest.NewManifest("test", "addons/odoopack", "19.0")
-	m.Indexes = manifest.Indexes{"a": {Url: url, Type: "registry"}}
+	m.Indexes = manifest.Indexes{{Name: "a", Url: url, Type: "registry"}}
 	m.Require = manifest.Requirements{"acme/base-tools": "19.0", "acme/other": "19.0"}
 	project(t, m, map[string]lockfile.LockedPackage{
 		"acme/base-tools": lockedAt(dist, "19.0.1.0.0", true),
@@ -146,7 +146,7 @@ func TestUpdateOneResolvesItsTree(t *testing.T) {
 		registryapi.Addon{Name: "acme/other", Versions: []registryapi.Version{release(dist, "19.0.1.0.0"), release(dist, "19.0.2.0.0")}},
 	)
 	m := manifest.NewManifest("test", "addons/odoopack", "19.0")
-	m.Indexes = manifest.Indexes{"a": {Url: url, Type: "registry"}}
+	m.Indexes = manifest.Indexes{{Name: "a", Url: url, Type: "registry"}}
 	m.Require = manifest.Requirements{"acme/health-check": "19.0", "acme/other": "19.0"}
 	project(t, m, map[string]lockfile.LockedPackage{
 		"acme/health-check": lockedAt(dist, "19.0.1.0.0", true, "acme/old-dep"),
@@ -179,7 +179,7 @@ func TestRemoveRemovesOrphans(t *testing.T) {
 	dist := addonZip(t)
 	m := manifest.NewManifest("test", "addons/odoopack", "19.0")
 	// Every package stays locked as it is, so remove must not ask the index.
-	m.Indexes = manifest.Indexes{"a": {Url: "http://127.0.0.1:1", Type: "registry"}}
+	m.Indexes = manifest.Indexes{{Name: "a", Url: "http://127.0.0.1:1", Type: "registry"}}
 	m.Require = manifest.Requirements{"acme/health-check": "19.0", "acme/other": "19.0"}
 	project(t, m, map[string]lockfile.LockedPackage{
 		"acme/health-check": lockedAt(dist, "19.0.1.0.0", true, "acme/base-tools", "acme/shared"),
