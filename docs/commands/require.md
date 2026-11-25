@@ -10,14 +10,21 @@ added acme/health-check@19.0.1.0.0 (1 package(s) installed, 0 removed)
 ## Usage
 
 ```
-odoopack require <addon>@<version>
+odoopack require <addon>[@<version>]
 ```
 
 Aliases: `add`, `req`.
 
 ## Arguments
 
-- `<addon>@<version>`: the addon name and an explicit version, separated by `@`. The version is **required**; there is no default and no version-range syntax. The value must exactly match a version advertised by the registry, for example a release version (`19.0.1.0.0`) or a branch build (`dev-19.0`).
+- `<addon>[@<version>]`: the package name and, after `@`, a [constraint](../reference/manifest.md#constraints): an exact release (`19.0.1.0.0`), a series (`19.0`) or a branch build (`dev-19.0`). Without a version, `require` writes the `odoo_series` of the manifest, so the package follows the newest release of the series:
+
+  ```console
+  $ odoopack require acme/health-check
+  added acme/health-check@19.0.2.1.0 (1 package(s) installed, 0 removed)
+  ```
+
+  The manifest then holds `"acme/health-check": "19.0"`, and the lockfile pins the release it resolved to. There is no range syntax.
 
 ## Flags
 
