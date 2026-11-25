@@ -5,6 +5,7 @@ import (
 	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"fmt"
+	"net/url"
 	"os"
 	"sort"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/wimwenigerkind/odoopack-spec/name"
 	"github.com/wimwenigerkind/odoopack-spec/version"
 	"github.com/wimwenigerkind/odoopack/pkg/helper"
+	"github.com/wimwenigerkind/odoopack/pkg/httpclient"
 	"github.com/wimwenigerkind/odoopack/pkg/index"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
 )
@@ -415,15 +417,29 @@ func lockPackage(lookup index.AddonVersion, direct bool, deps, external []string
 }
 
 // CheckIntegrity reports whether d pins its content: a zip by its sha256
-// digest, a git package by a full commit id.
+// digest, a git package by a full commit id. A zip is also downloaded over
+// https only: the digest keeps its content intact, but plain http would show
+// anyone on the way which packages a project installs.
 func (d Dist) CheckIntegrity() error {
 	switch d.Type {
 	case "zip":
 		if d.Digest == "" {
 			return fmt.Errorf("zip has no digest to verify it against")
 		}
-		_, err := digest.Parse(d.Digest)
-		return err
+		if _, err := digest.Parse(d.Digest); err != nil {
+			return err
+		}
+		u, err := url.Parse(d.URL)
+		if err != nil || u.Host == "" {
+			return fmt.Errorf("zip url %q is not an absolute url", d.URL)
+		}
+		switch {
+		case u.Scheme == "https":
+			return nil
+		case u.Scheme == "http" && httpclient.IsLoopback(u.Hostname()):
+			return nil
+		}
+		return fmt.Errorf("zip url %s must use https (plain http is only allowed for localhost)", u.Redacted())
 	case "git":
 		if d.Reference == "" {
 			return fmt.Errorf("git has no reference to check out")
