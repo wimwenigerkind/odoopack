@@ -134,7 +134,16 @@ func TestLockPackageRequiresIntegrity(t *testing.T) {
 		{"zip over http to localhost", index.AddonVersion{Type: "zip", Shasum: shasum, Repository: "http://localhost:8080/zipball/x"}, ""},
 		{"zip over http to loopback", index.AddonVersion{Type: "zip", Shasum: shasum, Repository: "http://127.0.0.1:8080/zipball/x"}, ""},
 		{"zip with relative url", index.AddonVersion{Type: "zip", Shasum: shasum, Repository: "/zipball/x"}, "not an absolute url"},
-		{"zip with credentials over http", index.AddonVersion{Type: "zip", Shasum: shasum, Repository: "http://user:secret@registry.example.com/x"}, "must use https"},
+		{"zip with credentials over http", index.AddonVersion{Type: "zip", Shasum: shasum, Repository: "http://user:secret@registry.example.com/x"}, "must not contain credentials"},
+		{"zip with credentials", index.AddonVersion{Type: "zip", Shasum: shasum, Repository: "https://user:secret@cdn.example.com/x.zip"}, "must not contain credentials"},
+		{"zip with token as user", index.AddonVersion{Type: "zip", Shasum: shasum, Repository: "https://secret@cdn.example.com/x.zip"}, "must not contain credentials"},
+		{"zip with signed query", index.AddonVersion{Type: "zip", Shasum: shasum, Repository: "https://cdn.example.com/x.zip?X-Amz-Signature=secret"}, "must not have a query"},
+		{"zip with fragment", index.AddonVersion{Type: "zip", Shasum: shasum, Repository: "https://cdn.example.com/x.zip#secret"}, "must not have a fragment"},
+		{"git over ssh with user", index.AddonVersion{Type: "git", Reference: commit, Repository: "ssh://git@github.com/acme/x.git"}, ""},
+		{"git scp style", index.AddonVersion{Type: "git", Reference: commit, Repository: "git@github.com:acme/x.git"}, ""},
+		{"git over https with token", index.AddonVersion{Type: "git", Reference: commit, Repository: "https://secret@github.com/acme/x.git"}, "must not contain credentials"},
+		{"git over ssh with password", index.AddonVersion{Type: "git", Reference: commit, Repository: "ssh://git:secret@github.com/acme/x.git"}, "must not contain credentials"},
+		{"git with query", index.AddonVersion{Type: "git", Reference: commit, Repository: "https://github.com/acme/x.git?token=secret"}, "must not have a query"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
