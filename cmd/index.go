@@ -6,11 +6,9 @@ package cmd
 import (
 	"fmt"
 	"net/url"
-	"sort"
+	"strconv"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-	"github.com/wimwenigerkind/odoopack/pkg/index"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
 	"github.com/wimwenigerkind/odoopack/pkg/ui"
 )
@@ -21,12 +19,18 @@ var indexCmd = &cobra.Command{
 	Aliases: []string{"idx"},
 }
 
-var indexAddType string
+var (
+	indexAddType   string
+	indexAddAppend bool
+)
 
 var indexAddCmd = &cobra.Command{
 	Use:   "add [name] [url]",
 	Short: "Add or replace a registry index",
-	Args:  cobra.ExactArgs(2),
+	Long: `Add a registry index in front of the others, so that it is searched first,
+or with --append behind them. An index with the same name is replaced where it
+is.`,
+	Args: cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		name := args[0]
 		raw := args[1]
@@ -43,10 +47,7 @@ var indexAddCmd = &cobra.Command{
 		if err != nil {
 			fatal(err)
 		}
-		if m.Indexes == nil {
-			m.Indexes = manifest.Indexes{}
-		}
-		m.Indexes[name] = manifest.Index{Url: raw, Type: indexAddType}
+		m.Indexes = m.Indexes.Add(manifest.Index{Name: name, Url: raw, Type: indexAddType}, indexAddAppend)
 		if err := manifest.Save(*m); err != nil {
 			fatal(err)
 		}
@@ -65,10 +66,10 @@ var indexRemoveCmd = &cobra.Command{
 		if err != nil {
 			fatal(err)
 		}
-		if _, ok := m.Indexes[name]; !ok {
+		var removed bool
+		if m.Indexes, removed = m.Indexes.Remove(name); !removed {
 			fatal(fmt.Errorf("index %q is not declared", name))
 		}
-		delete(m.Indexes, name)
 		if err := manifest.Save(*m); err != nil {
 			fatal(err)
 		}
@@ -87,34 +88,22 @@ var indexListCmd = &cobra.Command{
 			fatal(err)
 		}
 
-		names := make([]string, 0, len(m.Indexes))
-		for n := range m.Indexes {
-			names = append(names, n)
-		}
-		sort.Strings(names)
-
-		var rows [][]string
-		for _, n := range names {
-			idx := m.Indexes[n]
-			rows = append(rows, []string{n, idx.Url, idx.Type, "manifest"})
-		}
-
-		defaultURL := viper.GetString("default_index_url")
-		if index.UsesImplicitDefault(m.Indexes, defaultURL) {
-			rows = append(rows, []string{index.DefaultIndexName, defaultURL, "registry", "implicit"})
-		}
-
-		if len(rows) == 0 {
+		if len(m.Indexes) == 0 {
 			ui.Info("no indexes configured")
 			return
 		}
 
-		ui.Println(ui.Table([]string{"Name", "URL", "Type", "Source"}, rows))
+		var rows [][]string
+		for i, idx := range m.Indexes {
+			rows = append(rows, []string{strconv.Itoa(i + 1), idx.Name, idx.Url, idx.Type})
+		}
+		ui.Println(ui.Table([]string{"#", "Name", "URL", "Type"}, rows))
 	},
 }
 
 func init() {
 	indexAddCmd.Flags().StringVar(&indexAddType, "type", "registry", "index type")
+	indexAddCmd.Flags().BoolVar(&indexAddAppend, "append", false, "search the index after the others instead of first")
 	indexCmd.AddCommand(indexAddCmd)
 	indexCmd.AddCommand(indexRemoveCmd)
 	indexCmd.AddCommand(indexListCmd)

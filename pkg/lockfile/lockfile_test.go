@@ -109,7 +109,7 @@ func TestSaveWritesFormatVersionFirst(t *testing.T) {
 
 func TestFormatKeepsContentHash(t *testing.T) {
 	require := map[string]string{"acme/health-check": "19.0"}
-	indexes := manifest.Indexes{"company": {Url: "https://registry.example.com", Type: "odoopack"}}
+	indexes := manifest.Indexes{{Name: "company", Url: "https://registry.example.com", Type: "odoopack"}}
 	packages := map[string]LockedPackage{
 		"acme/health-check": {Version: "19.0.1.0.0", Dist: Dist{Type: "git", URL: "https://example.com/x.git"}, Direct: true},
 	}
@@ -160,7 +160,7 @@ func TestLoadReadsLegacyKeysAndKeepsContentHash(t *testing.T) {
 	}
 
 	require := map[string]string{"acme/health-check": "19.0"}
-	indexes := manifest.Indexes{"company": {Url: "https://registry.example.com", Type: "registry"}}
+	indexes := manifest.Indexes{{Name: "company", Url: "https://registry.example.com", Type: "registry"}}
 	stale, err := IsStale(require, indexes, "19.0", lf.Packages, lf.ContentHash)
 	if err != nil {
 		t.Fatal(err)
@@ -193,8 +193,8 @@ func TestLoadReadsLegacyKeysAndKeepsContentHash(t *testing.T) {
 
 func TestUnknownIndexKeysKeepContentHash(t *testing.T) {
 	require := map[string]string{"acme/health-check": "19.0"}
-	plain := manifest.Indexes{"company": {Url: "https://registry.example.com", Type: "registry"}}
-	extended := manifest.Indexes{"company": {Url: "https://registry.example.com", Type: "registry", Unknown: map[string]json.RawMessage{"priority": json.RawMessage(`10`)}}}
+	plain := manifest.Indexes{{Name: "company", Url: "https://registry.example.com", Type: "registry"}}
+	extended := manifest.Indexes{{Name: "company", Url: "https://registry.example.com", Type: "registry", Unknown: map[string]json.RawMessage{"priority": json.RawMessage(`10`)}}}
 
 	hash, err := ComputeHash(require, plain, "19.0", nil)
 	if err != nil {
@@ -274,11 +274,20 @@ func TestChangedSeriesMakesLockfileStale(t *testing.T) {
 
 func previousHash(t *testing.T, require map[string]string, indexes manifest.Indexes, packages map[string]LockedPackage) string {
 	t.Helper()
+	// The previous odoopack kept indexes as an object by name.
+	type index struct {
+		Url  string `json:"url"`
+		Type string `json:"type"`
+	}
+	byName := make(map[string]index, len(indexes))
+	for _, idx := range indexes {
+		byName[idx.Name] = index{Url: idx.Url, Type: idx.Type}
+	}
 	payload := struct {
 		Require  map[string]string        `json:"require"`
-		Indexes  manifest.Indexes         `json:"indexes"`
+		Indexes  map[string]index         `json:"indexes"`
 		Packages map[string]LockedPackage `json:"packages"`
-	}{Require: require, Indexes: indexes, Packages: packages}
+	}{Require: require, Indexes: byName, Packages: packages}
 
 	data, err := json.Marshal(payload)
 	if err != nil {
@@ -289,7 +298,7 @@ func previousHash(t *testing.T, require map[string]string, indexes manifest.Inde
 
 func TestPreviousHashIsNotStale(t *testing.T) {
 	require := map[string]string{"acme/health-check": "19.0"}
-	indexes := manifest.Indexes{"company": {Url: "https://registry.example.com", Type: "registry"}}
+	indexes := manifest.Indexes{{Name: "company", Url: "https://registry.example.com", Type: "registry"}}
 	packages := map[string]LockedPackage{
 		"acme/health-check": {Version: "19.0.1.0.0", Dist: Dist{Type: "git", URL: "https://example.com/x.git"}, Direct: true},
 	}

@@ -183,10 +183,10 @@ func TestRegistryLookupRefusesOversizedMetadata(t *testing.T) {
 }
 
 func TestLookupRefusesTokenOverPlainHTTP(t *testing.T) {
-	useDefault(t, "")
+	t.Cleanup(viper.Reset)
 	viper.Set("auth", `{"bearer":{"registry.example.com":"secret"}}`)
 
-	indexes := manifest.Indexes{"company": {Url: "http://registry.example.com", Type: "registry"}}
+	indexes := manifest.Indexes{{Name: "company", Url: "http://registry.example.com", Type: "registry"}}
 	_, err := Lookup(indexes, "acme/health-check", "19.0", "19.0")
 	if err == nil || !strings.Contains(err.Error(), "index company (http://registry.example.com)") || !strings.Contains(err.Error(), "plain http") {
 		t.Fatalf("got error %v, want the token refused for index company", err)
@@ -199,10 +199,10 @@ func TestLookupSendsTokenOverHTTPToLocalhost(t *testing.T) {
 		auth.Store(r.Header.Get("Authorization"))
 		serving(w, r)
 	})
-	useDefault(t, "")
+	t.Cleanup(viper.Reset)
 	viper.Set("auth", `{"bearer":{"`+strings.TrimPrefix(url, "http://")+`":"secret"}}`)
 
-	if _, err := Lookup(manifest.Indexes{"local": {Url: url, Type: "registry"}}, "acme/health-check", "19.0", "19.0"); err != nil {
+	if _, err := Lookup(manifest.Indexes{{Name: "local", Url: url, Type: "registry"}}, "acme/health-check", "19.0", "19.0"); err != nil {
 		t.Fatal(err)
 	}
 	if got := auth.Load(); got != "Bearer secret" {
@@ -212,10 +212,10 @@ func TestLookupSendsTokenOverHTTPToLocalhost(t *testing.T) {
 
 func TestLookupFailsOnMalformedAuth(t *testing.T) {
 	url, hits := registry(t, serving)
-	useDefault(t, "")
+	t.Cleanup(viper.Reset)
 	viper.Set("auth", `registry.example.com=secret`)
 
-	_, err := Lookup(manifest.Indexes{"local": {Url: url, Type: "registry"}}, "acme/health-check", "19.0", "19.0")
+	_, err := Lookup(manifest.Indexes{{Name: "local", Url: url, Type: "registry"}}, "acme/health-check", "19.0", "19.0")
 	if err == nil || !strings.Contains(err.Error(), "ODOOPACK_AUTH is not valid") {
 		t.Fatalf("got error %v, want ODOOPACK_AUTH refused", err)
 	}

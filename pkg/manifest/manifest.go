@@ -33,6 +33,7 @@ func Load() (*Manifest, error) {
 	if err != nil {
 		return nil, err
 	}
+	manifest.migrateIndexes(viper.GetString("default_index_url"))
 	// Save keeps these keys, so a key a newer odoopack added survives a
 	// write by this one. The warning catches a misspelt key, which would
 	// otherwise be ignored silently.
@@ -67,6 +68,9 @@ func Init(name, odoo string) (Manifest, error) {
 	}
 
 	manifest := NewManifest(name, viper.GetString("addons_path"), odoo)
+	if defaultURL := viper.GetString("default_index_url"); defaultURL != "" {
+		manifest.Indexes = append(manifest.Indexes, Index{Name: DefaultIndexName, Url: defaultURL, Type: "registry"})
+	}
 
 	if err := Save(*manifest); err != nil {
 		return Manifest{}, err

@@ -40,13 +40,6 @@ func hanging(_ http.ResponseWriter, r *http.Request) {
 	<-r.Context().Done()
 }
 
-// useDefault sets the implicit default index for the test.
-func useDefault(t *testing.T, url string) {
-	t.Helper()
-	viper.Set("default_index_url", url)
-	t.Cleanup(viper.Reset)
-}
-
 func TestLookupFallsThroughOnlyOnNotFound(t *testing.T) {
 	client := httpClient
 	httpClient = &http.Client{Timeout: 200 * time.Millisecond}
@@ -66,10 +59,9 @@ func TestLookupFallsThroughOnlyOnNotFound(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			first, _ := registry(t, tc.first)
 			second, secondHits := registry(t, serving)
-			useDefault(t, "")
 			indexes := manifest.Indexes{
-				"a": {Url: first, Type: "registry"},
-				"b": {Url: second, Type: "registry"},
+				{Name: "a", Url: first, Type: "registry"},
+				{Name: "b", Url: second, Type: "registry"},
 			}
 
 			got, err := Lookup(indexes, "acme/health-check", "19.0", "19.0")
@@ -101,10 +93,9 @@ func TestLookupFallsThroughOnlyOnNotFound(t *testing.T) {
 func TestLookupNotFoundListsAttempts(t *testing.T) {
 	first, _ := registry(t, status(http.StatusNotFound))
 	second, _ := registry(t, status(http.StatusNotFound))
-	useDefault(t, "")
 	indexes := manifest.Indexes{
-		"a": {Url: first, Type: "registry"},
-		"b": {Url: second, Type: "registry"},
+		{Name: "a", Url: first, Type: "registry"},
+		{Name: "b", Url: second, Type: "registry"},
 	}
 
 	_, err := Lookup(indexes, "acme/health-check", "19.0", "19.0")
@@ -116,77 +107,72 @@ func TestLookupNotFoundListsAttempts(t *testing.T) {
 	}
 }
 
-func TestLookupTriesImplicitDefaultLast(t *testing.T) {
-	configured, configuredHits := registry(t, status(http.StatusNotFound))
+func TestLookupFollowsIndexOrder(t *testing.T) {
+	company, companyHits := registry(t, serving)
 	public, publicHits := registry(t, serving)
-	useDefault(t, public)
 
-	got, err := Lookup(manifest.Indexes{"company": {Url: configured, Type: "registry"}}, "acme/health-check", "19.0", "19.0")
+	got, err := Lookup(manifest.Indexes{
+		{Name: "public", Url: public, Type: "registry"},
+		{Name: "company", Url: company, Type: "registry"},
+	}, "acme/health-check", "19.0", "19.0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Registry != public {
-		t.Fatalf("resolved from %q, want the default index %s", got.Registry, public)
+	if got.Registry != public || companyHits.Load() != 0 {
+		t.Fatalf("resolved from %q with %d request(s) to company, want the first index %s only", got.Registry, companyHits.Load(), public)
 	}
-	if configuredHits.Load() != 1 || publicHits.Load() != 1 {
-		t.Fatalf("got %d request(s) to the configured and %d to the default index, want one each", configuredHits.Load(), publicHits.Load())
+
+	publicHits.Store(0)
+	got, err = Lookup(manifest.Indexes{
+		{Name: "company", Url: company, Type: "registry"},
+		{Name: "public", Url: public, Type: "registry"},
+	}, "acme/health-check", "19.0", "19.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Registry != company || publicHits.Load() != 0 {
+		t.Fatalf("resolved from %q with %d request(s) to public, want the first index %s only", got.Registry, publicHits.Load(), company)
 	}
 }
 
-func TestLookupNeverFallsBackToDefaultOnErrors(t *testing.T) {
+func TestLookupNeverFallsBackOnErrors(t *testing.T) {
 	for _, code := range []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusInternalServerError} {
 		configured, _ := registry(t, status(code))
 		public, publicHits := registry(t, serving)
-		useDefault(t, public)
 
-		_, err := Lookup(manifest.Indexes{"company": {Url: configured, Type: "registry"}}, "acme/health-check", "19.0", "19.0")
+		_, err := Lookup(manifest.Indexes{
+			{Name: "company", Url: configured, Type: "registry"},
+			{Name: "public", Url: public, Type: "registry"},
+		}, "acme/health-check", "19.0", "19.0")
 		if err == nil || !strings.Contains(err.Error(), "index company") {
 			t.Fatalf("status %d: got error %v, want one naming the configured index", code, err)
 		}
 		if n := publicHits.Load(); n != 0 {
-			t.Fatalf("status %d: the default index got %d request(s)", code, n)
+			t.Fatalf("status %d: the next index got %d request(s)", code, n)
 		}
 	}
 }
 
-func TestLookupSkipsImplicitDefaultConfiguredExplicitly(t *testing.T) {
-	public, publicHits := registry(t, status(http.StatusNotFound))
-	useDefault(t, public)
+func TestLookupHasNoImplicitDefault(t *testing.T) {
+	public, hits := registry(t, serving)
+	viper.Set("default_index_url", public)
+	t.Cleanup(viper.Reset)
 
-	for _, indexes := range []manifest.Indexes{
-		{"public": {Url: public, Type: "registry"}},
-		{"default": {Url: public, Type: "registry"}},
-	} {
-		publicHits.Store(0)
-		if _, err := Lookup(indexes, "acme/health-check", "19.0", "19.0"); err == nil {
-			t.Fatal("expected not found")
-		}
-		if n := publicHits.Load(); n != 1 {
-			t.Fatalf("indexes %v: the default registry got %d request(s), want exactly one", indexes, n)
-		}
+	_, err := Lookup(nil, "acme/health-check", "19.0", "19.0")
+	if err == nil || !strings.Contains(err.Error(), "no indexes configured") {
+		t.Fatalf("got error %v, want one about no indexes", err)
 	}
-}
-
-func TestLookupUsesImplicitDefaultWithoutIndexes(t *testing.T) {
-	public, _ := registry(t, serving)
-	useDefault(t, public)
-
-	got, err := Lookup(nil, "acme/health-check", "19.0", "19.0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.Registry != public {
-		t.Fatalf("resolved from %q, want the default index %s", got.Registry, public)
+	if n := hits.Load(); n != 0 {
+		t.Fatalf("the default registry got %d request(s) although no index lists it", n)
 	}
 }
 
 func TestLookupLockedAsksOnlyItsIndex(t *testing.T) {
 	first, firstHits := registry(t, serving)
 	second, _ := registry(t, serving)
-	useDefault(t, "")
 	indexes := manifest.Indexes{
-		"a": {Url: first, Type: "registry"},
-		"b": {Url: second, Type: "registry"},
+		{Name: "a", Url: first, Type: "registry"},
+		{Name: "b", Url: second, Type: "registry"},
 	}
 
 	for _, locked := range []string{second, "b"} {
@@ -203,10 +189,9 @@ func TestLookupLockedAsksOnlyItsIndex(t *testing.T) {
 func TestLookupLockedFindsRenamedIndexByURL(t *testing.T) {
 	first, firstHits := registry(t, serving)
 	second, _ := registry(t, serving)
-	useDefault(t, "")
 	indexes := manifest.Indexes{
-		"a":       {Url: first, Type: "registry"},
-		"renamed": {Url: second + "/", Type: "registry"},
+		{Name: "a", Url: first, Type: "registry"},
+		{Name: "renamed", Url: second + "/", Type: "registry"},
 	}
 
 	got, err := LookupLocked(indexes, second, "acme/health-check", "19.0", "19.0")
@@ -234,10 +219,9 @@ func TestNormalizeURL(t *testing.T) {
 func TestLookupLockedDoesNotFallThrough(t *testing.T) {
 	first, _ := registry(t, serving)
 	second, _ := registry(t, status(http.StatusNotFound))
-	useDefault(t, "")
 	indexes := manifest.Indexes{
-		"a": {Url: first, Type: "registry"},
-		"b": {Url: second, Type: "registry"},
+		{Name: "a", Url: first, Type: "registry"},
+		{Name: "b", Url: second, Type: "registry"},
 	}
 
 	_, err := LookupLocked(indexes, "b", "acme/health-check", "19.0", "19.0")
@@ -248,9 +232,8 @@ func TestLookupLockedDoesNotFallThrough(t *testing.T) {
 
 func TestLookupLockedToRemovedIndexResolvesAgain(t *testing.T) {
 	first, _ := registry(t, serving)
-	useDefault(t, "")
 
-	got, err := LookupLocked(manifest.Indexes{"a": {Url: first, Type: "registry"}}, "gone", "acme/health-check", "19.0", "19.0")
+	got, err := LookupLocked(manifest.Indexes{{Name: "a", Url: first, Type: "registry"}}, "gone", "acme/health-check", "19.0", "19.0")
 	if err != nil {
 		t.Fatal(err)
 	}
