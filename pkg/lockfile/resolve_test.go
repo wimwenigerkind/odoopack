@@ -138,7 +138,7 @@ func TestLockfileWithoutIndexKeepsContentHash(t *testing.T) {
 	packages := map[string]LockedPackage{
 		"acme/health-check": {Version: "19.0.1.0.0", Dist: Dist{Type: "git", URL: "https://example.com/x.git"}, Direct: true},
 	}
-	hash, err := ComputeHash(require, indexes, "19.0", packages)
+	hash, err := packagesHash(require, indexes, "19.0", packages)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,7 +228,7 @@ func TestUpdateResolvesTreeAndKeepsOthers(t *testing.T) {
 	if got := lf.Packages["acme/other"]; got.Version != "19.0.1.0.0" || !got.Direct {
 		t.Errorf("acme/other locked as %+v, want it kept at 19.0.1.0.0", got)
 	}
-	if want, _ := ComputeHash(require, indexes, "19.0", lf.Packages); lf.ContentHash != want {
+	if want, _ := ComputeHash(require, indexes, "19.0"); lf.ContentHash != want {
 		t.Error("content hash does not match the packages")
 	}
 }

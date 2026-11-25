@@ -28,7 +28,7 @@ The lockfile pins the exact distribution of every requirement so that installs a
 | Field | Type | Description |
 | --- | --- | --- |
 | `format_version` | integer | Version of the lockfile format, currently `1`. A lockfile without it is version 1. odoopack refuses a lockfile with a higher version than it knows and asks you to upgrade odoopack; it always writes the current version. Adding an optional field does not raise it. Not part of `content_hash`, so a lockfile does not become stale when it gains the field. Releases before `format_version` wrote the same number as `format`; odoopack still reads it and replaces it with `format_version` the next time it writes the lockfile. |
-| `content_hash` | string | `sha256:` hash of the requirements, the URL and type of each index, the `odoo_series` of the manifest, and the locked packages. Used to detect when the lockfile is stale relative to the manifest. Index names are not part of it, so renaming an index does not make the lockfile stale. |
+| `content_hash` | string | `sha256:` hash of what the manifest resolves the packages from. Used to detect when the lockfile is stale relative to the manifest. See [Content hash](#content-hash). |
 | `packages` | object | Map of addon name to the locked package. |
 
 ### `packages.<name>`
@@ -73,6 +73,27 @@ Nothing is written when resolution fails. Dependencies carry only the series for
 
 [`update <addon>`](../commands/update.md) and [`remove`](../commands/remove.md) keep a locked package as it is when its locked version still meets its requirements, comes from an index the manifest still has (by URL), and pins its content. [`install`](../commands/install.md) on a stale lockfile, [`require`](../commands/require.md), and `update` without an argument resolve every package again.
 
+## Content hash
+
+`content_hash` covers the manifest only, so that any tool can compute it from `odoopack.json` without odoopack:
+
+1. Take this JSON object from the manifest:
+   - `odoo_series`: the string as written.
+   - `require`: the object as written.
+   - `indexes`: an array with one object `{"type": ..., "url": ...}` per index, the URL with scheme and host in lower case and without a trailing slash, sorted by `url` and then by `type`.
+2. Serialize it in the canonical form of [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785) (JSON Canonicalization Scheme).
+3. Take the SHA-256 of those bytes and write it as `sha256:` followed by the lowercase hex digest.
+
+For example, a manifest with `"odoo_series": "19.0"`, `"require": {"acme/health-check": "19.0"}` and the one index `https://registry.example.com` hashes the bytes
+
+```json
+{"indexes":[{"type":"registry","url":"https://registry.example.com"}],"odoo_series":"19.0","require":{"acme/health-check":"19.0"}}
+```
+
+The name and position of an index, keys odoopack does not know, `name`, `addons_dir`, `extra` and `format_version` are not part of it: none of them changes what a package resolves to, since a package is locked to the URL of its index. The locked packages are not part of it either; `dist.digest` and `dist.reference` pin their content.
+
+Lockfiles written by earlier releases hold a hash that also covered the locked packages. odoopack still accepts it as fresh and writes the hash above the next time it writes the lockfile.
+
 ## Staleness
 
-When you change `require`, the URL or type of an index, or `odoo_series` in the manifest, the lockfile's `content_hash` no longer matches. [`install`](../commands/install.md) detects this, re-resolves against the registry, and rewrites the lockfile before installing, or fails with `--frozen-lockfile`. [`update`](../commands/update.md) always re-resolves.
+When you change `require`, the URL or type of an index, or `odoo_series` in the manifest, the lockfile's `content_hash` no longer matches. A lockfile that lacks a package `require` names is stale as well, whatever its hash. [`install`](../commands/install.md) detects this, re-resolves against the registry, and rewrites the lockfile before installing, or fails with `--frozen-lockfile`. [`update`](../commands/update.md) always re-resolves.

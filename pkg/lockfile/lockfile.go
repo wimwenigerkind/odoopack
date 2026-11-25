@@ -103,11 +103,32 @@ func Save(lockFile LockFile) error {
 	return os.WriteFile(viper.GetString("lock"), data, 0644)
 }
 
-// ComputeHash covers everything the packages were resolved from, so that a
-// change to any of it makes the lockfile stale. The indexes take part by URL
-// and type only: packages are locked to the URL, so renaming an index leaves
-// the lockfile fresh.
-func ComputeHash(require map[string]string, indexes manifest.Indexes, odoo string, packages map[string]LockedPackage) (string, error) {
+// ComputeHash covers what the manifest resolves the packages from, so that
+// a change to it makes the lockfile stale, and nothing else, so that any tool
+// can compute it from the manifest alone: the RFC 8785 canonical form of
+// odoo_series, require and the URL and type of each index, sorted by URL. The
+// name and position of an index stay out, since a package is locked to the
+// URL of its index; so do the locked packages, which dist.digest and
+// dist.reference pin.
+func ComputeHash(require map[string]string, indexes manifest.Indexes, odooSeries string) (string, error) {
+	data, err := json.Marshal(struct {
+		OdooSeries string            `json:"odoo_series"`
+		Require    map[string]string `json:"require"`
+		Indexes    []hashedIndex     `json:"indexes"`
+	}{OdooSeries: odooSeries, Require: require, Indexes: hashedIndexes(indexes)})
+	if err != nil {
+		return "", err
+	}
+	canonical := jsontext.Value(data)
+	if err := canonical.Canonicalize(); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("sha256:%x", sha256.Sum256(canonical)), nil
+}
+
+// packagesHash is content_hash as odoopack computed it while the hash also
+// covered the locked packages.
+func packagesHash(require map[string]string, indexes manifest.Indexes, odoo string, packages map[string]LockedPackage) (string, error) {
 	return hashJSON(struct {
 		Require  map[string]string        `json:"require"`
 		Indexes  []hashedIndex            `json:"indexes"`
@@ -205,9 +226,8 @@ func legacyHash(require map[string]string, indexes manifest.Indexes, packages ma
 	}{Require: require, Indexes: namedIndexes(indexes), Packages: hashedPackages(packages)})
 }
 
-// hashJSON keeps encoding/json v1, whose output defines every content_hash
-// written so far: v2 escapes and orders differently, which would make every
-// lockfile stale.
+// hashJSON computes the hashes of earlier releases, which encoding/json v1
+// defines: v2 escapes and orders differently.
 func hashJSON(payload any) (string, error) {
 	data, err := jsonv1.Marshal(payload)
 	if err != nil {
@@ -218,8 +238,16 @@ func hashJSON(payload any) (string, error) {
 	return fmt.Sprintf("sha256:%x", hash), nil
 }
 
+// IsStale reports whether the lockfile no longer matches the manifest: its
+// hash differs, or a required package is missing, which the hash cannot tell
+// since it does not cover the packages.
 func IsStale(require map[string]string, indexes manifest.Indexes, odoo string, packages map[string]LockedPackage, hash string) (bool, error) {
-	computedHash, err := ComputeHash(require, indexes, odoo, packages)
+	for pkg := range require {
+		if _, ok := packages[pkg]; !ok {
+			return true, nil
+		}
+	}
+	computedHash, err := ComputeHash(require, indexes, odoo)
 	if err != nil {
 		return false, err
 	}
@@ -230,6 +258,13 @@ func IsStale(require map[string]string, indexes manifest.Indexes, odoo string, p
 	// Lockfiles hashed the way an older odoopack did are still fresh, so that
 	// upgrading odoopack does not make install --frozen-lockfile fail in every
 	// project. The next write hashes them the current way.
+	previous, err := packagesHash(require, indexes, odoo, packages)
+	if err != nil {
+		return false, err
+	}
+	if previous == hash {
+		return false, nil
+	}
 	named, err := namedHash(require, indexes, odoo, packages)
 	if err != nil {
 		return false, err
@@ -455,7 +490,7 @@ func (r *resolver) lockFile() (LockFile, error) {
 	if err := CheckModuleCollisions(r.packages); err != nil {
 		return LockFile{}, err
 	}
-	hash, err := ComputeHash(r.require, r.indexes, r.odooSeries, r.packages)
+	hash, err := ComputeHash(r.require, r.indexes, r.odooSeries)
 	if err != nil {
 		return LockFile{}, err
 	}
