@@ -34,6 +34,7 @@ func TestValidateRejects(t *testing.T) {
 	}{
 		{"missing series", func(m *Manifest) { m.OdooSeries = "" }, "odoo_series is not set"},
 		{"invalid series", func(m *Manifest) { m.OdooSeries = "19" }, `odoo_series "19"`},
+		{"leading zero", func(m *Manifest) { m.OdooSeries = "019.0" }, `odoo_series "019.0"`},
 		{"latest", func(m *Manifest) { m.Require["acme/health-check"] = "latest" }, "require acme/health-check"},
 		{"spaces", func(m *Manifest) { m.Require["acme/health-check"] = " 19.0" }, "surrounding spaces"},
 		{"package name", func(m *Manifest) { m.Require["Acme/x"] = "19.0" }, `"Acme/x"`},
