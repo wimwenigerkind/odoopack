@@ -46,6 +46,13 @@ func TestValidateRejects(t *testing.T) {
 		{"fragment", func(m *Manifest) { m.Indexes[0].Url = "https://registry.example.com#x" }, "query or fragment"},
 		{"scheme", func(m *Manifest) { m.Indexes[0].Url = "ftp://registry.example.com" }, "https://"},
 		{"no host", func(m *Manifest) { m.Indexes[0].Url = "https:///odoo" }, "has no host"},
+		{"upper case host", func(m *Manifest) { m.Indexes[0].Url = "https://Registry.example.com/odoo" }, `must be written as "https://registry.example.com/odoo"`},
+		{"trailing slash", func(m *Manifest) { m.Indexes[0].Url = "https://registry.example.com/odoo/" }, `must be written as "https://registry.example.com/odoo"`},
+		{"default port", func(m *Manifest) { m.Indexes[0].Url = "https://registry.example.com:443/odoo" }, `must be written as "https://registry.example.com/odoo"`},
+		{"percent escape", func(m *Manifest) { m.Indexes[0].Url = "https://registry.example.com/a%2Fb" }, "percent escapes"},
+		{"same url twice", func(m *Manifest) {
+			m.Indexes = append(m.Indexes, Index{Name: "other", Url: m.Indexes[0].Url, Type: "registry"})
+		}, "have the same url"},
 		{"addons_dir missing", func(m *Manifest) { m.AddonsDir = "" }, "addons_dir is not set"},
 		{"addons_dir backslash", func(m *Manifest) { m.AddonsDir = `addons\odoopack` }, "addons_dir"},
 		{"addons_dir absolute", func(m *Manifest) { m.AddonsDir = "/srv/addons" }, "addons_dir"},
@@ -91,5 +98,35 @@ func TestSaveRefusesInvalidManifest(t *testing.T) {
 	}
 	if data, err := os.ReadFile(path); err != nil || len(data) != 0 {
 		t.Fatalf("manifest was written: %q (%v)", data, err)
+	}
+}
+
+func TestCanonicalURL(t *testing.T) {
+	for raw, want := range map[string]string{
+		"https://Registry.Example.com/":      "https://registry.example.com",
+		"HTTPS://registry.example.com/odoo/": "https://registry.example.com/odoo",
+		"https://registry.example.com:443":   "https://registry.example.com",
+		"http://registry.example.com:80/x":   "http://registry.example.com/x",
+		"https://registry.example.com:8443":  "https://registry.example.com:8443",
+		"http://localhost:8080//":            "http://localhost:8080",
+		"https://[::1]:443/":                 "https://[::1]",
+		"https://registry.example.com":       "https://registry.example.com",
+	} {
+		if got := CanonicalURL(raw); got != want {
+			t.Errorf("CanonicalURL(%q) = %q, want %q", raw, got, want)
+		}
+		if err := ValidIndexURL(want); err != nil {
+			t.Errorf("canonical url %q is not valid: %v", want, err)
+		}
+	}
+}
+
+func TestCanonicalURLKeepsPercentEscapes(t *testing.T) {
+	const raw = "https://registry.example.com/a%2Fb"
+	if got := CanonicalURL(raw); got != raw {
+		t.Fatalf("CanonicalURL(%q) = %q, want it unchanged", raw, got)
+	}
+	if err := ValidIndexURL(raw); err == nil || !strings.Contains(err.Error(), "percent escapes") {
+		t.Fatalf("got error %v, want one about percent escapes", err)
 	}
 }

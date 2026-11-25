@@ -3,7 +3,6 @@ package index
 import (
 	"errors"
 	"fmt"
-	"net/url"
 	"strings"
 
 	"github.com/wimwenigerkind/odoopack/pkg/auth"
@@ -53,26 +52,11 @@ func Lookup(indexes manifest.Indexes, name, constraint, odooSeries string) (Addo
 	return LookupLocked(indexes, "", name, constraint, odooSeries)
 }
 
-// NormalizeURL is the form a registry URL is locked under: scheme and host
-// in lower case, no trailing slash, so that two spellings of one index lock
-// the same.
-func NormalizeURL(raw string) string {
-	u, err := url.Parse(raw)
-	if err != nil || u.Host == "" {
-		return strings.TrimRight(raw, "/")
-	}
-	u.Scheme = strings.ToLower(u.Scheme)
-	u.Host = strings.ToLower(u.Host)
-	u.Path = strings.TrimRight(u.Path, "/")
-	u.RawPath = ""
-	return u.String()
-}
-
 // locatedBy reports whether a package locked to the index URL locked comes
 // from idx. A package is locked to the URL, so renaming the index does not
 // change the lockfile.
 func locatedBy(idx manifest.Index, locked string) bool {
-	return locked != "" && NormalizeURL(idx.Url) == locked
+	return locked != "" && idx.Url == locked
 }
 
 // HasIndex reports whether indexes still have the index a package is locked
@@ -98,7 +82,7 @@ func LookupLocked(indexes manifest.Indexes, locked, name, constraint, odooSeries
 		if err != nil {
 			return AddonVersion{}, fmt.Errorf("addon %q@%s is locked to index %s (%s): %w", name, constraint, idx.Name, idx.Url, err)
 		}
-		result.Registry = NormalizeURL(idx.Url)
+		result.Registry = idx.Url
 		return result, nil
 	}
 
@@ -106,7 +90,7 @@ func LookupLocked(indexes manifest.Indexes, locked, name, constraint, odooSeries
 	for _, idx := range indexes {
 		result, err := lookupIn(idx, name, constraint, odooSeries)
 		if err == nil {
-			result.Registry = NormalizeURL(idx.Url)
+			result.Registry = idx.Url
 			return result, nil
 		}
 		if !errors.Is(err, ErrNotFound) {
