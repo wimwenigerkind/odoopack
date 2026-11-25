@@ -3,7 +3,7 @@ package lockfile
 import (
 	"bytes"
 	"crypto/sha256"
-	"encoding/json"
+	jsonv1 "encoding/json"
 	"encoding/json/jsontext"
 	"fmt"
 	"os"
@@ -290,7 +290,7 @@ func previousHash(t *testing.T, require map[string]string, indexes manifest.Inde
 		Packages map[string]LockedPackage `json:"packages"`
 	}{Require: require, Indexes: byName, Packages: packages}
 
-	data, err := json.Marshal(payload)
+	data, err := jsonv1.Marshal(payload)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -352,5 +352,47 @@ func TestLoadRejectsModuleCollision(t *testing.T) {
 	_, err := Load()
 	if err == nil || !strings.Contains(err.Error(), path) || !strings.Contains(err.Error(), "acme/a-b and acme/a_b") {
 		t.Fatalf("got error %v, want one naming %s and both packages", err, path)
+	}
+}
+
+func TestSaveWritesWhatV1Wrote(t *testing.T) {
+	path := useLock(t, "")
+	lf := LockFile{
+		ContentHash: "sha256:00",
+		Packages: map[string]LockedPackage{
+			"acme/health-check": {
+				Version:         "19.0.1.0.0",
+				Dist:            Dist{Type: "zip", URL: "https://registry.example.com/z", Reference: "6b6c390a387c81ee604b602e49ca6c35646cc619", Digest: "sha256:ece96e65881389c3ef6538ea26b9d7149e8e0af042c828d17283c6b76c633543"},
+				Direct:          true,
+				Depends:         []string{"acme/base-tools"},
+				ExternalModules: []string{"base"},
+				IndexURL:        "https://registry.example.com",
+			},
+			"acme/base-tools": {Version: "dev-19.0", Dist: Dist{Type: "git", URL: "https://example.com/x.git", Reference: "6b6c390a387c81ee604b602e49ca6c35646cc619"}},
+		},
+	}
+	if err := Save(lf); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lf.FormatVersion = FormatVersion
+	want, err := jsonv1.MarshalIndent(lf, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("got\n%s\nwant what encoding/json v1 wrote\n%s", got, want)
+	}
+}
+
+func TestLoadRejectsDuplicateKeys(t *testing.T) {
+	useLock(t, `{"format_version":1,"content_hash":"sha256:00","packages":{"acme/x":{"version":"19.0.1.0.0","version":"19.0.2.0.0","dist":{"type":"git","url":"https://example.com/x.git"}}}}`)
+
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "duplicate") {
+		t.Fatalf("got error %v, want one about the duplicate key", err)
 	}
 }
