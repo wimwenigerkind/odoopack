@@ -20,7 +20,7 @@ import (
 
 // release is a version of an addon whose zipball is dist.
 func release(dist lockfile.Dist, version string, depends ...string) registryapi.Version {
-	v := registryapi.Version{Version: version, Type: registryapi.TypeZip, URL: dist.URL, Shasum: dist.Shasum}
+	v := registryapi.Version{Version: version, Type: registryapi.TypeZip, URL: dist.URL, Shasum: dist.Digest}
 	for _, d := range depends {
 		v.Depends = append(v.Depends, registryapi.Dep{Module: name.ModuleName(d), Package: d, Access: registryapi.AccessOK})
 	}
@@ -59,18 +59,18 @@ func project(t *testing.T, m *manifest.Manifest, packages map[string]lockfile.Lo
 	if err := manifest.Save(*m); err != nil {
 		t.Fatal(err)
 	}
-	hash, err := lockfile.ComputeHash(m.Require, m.Indexes, m.Odoo, packages)
+	hash, err := lockfile.ComputeHash(m.Require, m.Indexes, m.OdooSeries, packages)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := lockfile.Save(lockfile.LockFile{ContentHash: hash, Packages: packages}); err != nil {
 		t.Fatal(err)
 	}
-	if err := addonsdir.Claim(m.AddonsPath, nil); err != nil {
+	if err := addonsdir.Claim(m.AddonsDir, nil); err != nil {
 		t.Fatal(err)
 	}
 	for pkg := range packages {
-		dir := filepath.Join(m.AddonsPath, name.ModuleName(pkg))
+		dir := filepath.Join(m.AddonsDir, name.ModuleName(pkg))
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			t.Fatal(err)
 		}
@@ -85,7 +85,7 @@ func project(t *testing.T, m *manifest.Manifest, packages map[string]lockfile.Lo
 func assertAddons(t *testing.T, m *manifest.Manifest, want map[string]string) {
 	t.Helper()
 	for pkg, state := range want {
-		dir := filepath.Join(m.AddonsPath, name.ModuleName(pkg))
+		dir := filepath.Join(m.AddonsDir, name.ModuleName(pkg))
 		_, errStale := os.Stat(filepath.Join(dir, "stale.py"))
 		_, errDir := os.Stat(dir)
 		var got string
@@ -227,7 +227,7 @@ func TestRemoveRefusesWhileDependedOn(t *testing.T) {
 	}
 
 	shasum := "sha256:ece96e65881389c3ef6538ea26b9d7149e8e0af042c828d17283c6b76c633543"
-	dist := lockfile.Dist{Type: "zip", URL: "https://example.com/x.zip", Shasum: shasum}
+	dist := lockfile.Dist{Type: "zip", URL: "https://example.com/x.zip", Digest: shasum}
 	lock, err := json.Marshal(lockfile.LockFile{FormatVersion: lockfile.FormatVersion, ContentHash: "sha256:00", Packages: map[string]lockfile.LockedPackage{
 		"acme/health-check": lockedAt(dist, "19.0.1.0.0", true, "acme/base-tools"),
 		"acme/base-tools":   lockedAt(dist, "19.0.1.0.0", true),

@@ -122,8 +122,44 @@ func ComputeHash(require map[string]string, indexes manifest.Indexes, odoo strin
 		Require  map[string]string        `json:"require"`
 		Indexes  []manifest.Index         `json:"indexes"`
 		Odoo     string                   `json:"odoo"`
-		Packages map[string]LockedPackage `json:"packages"`
-	}{Require: require, Indexes: hashedIndexes(indexes), Odoo: odoo, Packages: packages})
+		Packages map[string]hashedPackage `json:"packages"`
+	}{Require: require, Indexes: hashedIndexes(indexes), Odoo: odoo, Packages: hashedPackages(packages)})
+}
+
+// hashedPackage is a locked package as content_hash covers it. It keeps the
+// keys the lockfile had before they were renamed, so that renaming a key in
+// the lockfile does not make every lockfile stale.
+type hashedPackage struct {
+	Version  string     `json:"version"`
+	Dist     hashedDist `json:"dist"`
+	Direct   bool       `json:"direct"`
+	Depends  []string   `json:"depends,omitempty"`
+	External []string   `json:"external,omitempty"`
+	Registry string     `json:"registry,omitempty"`
+	Index    string     `json:"index,omitempty"`
+}
+
+type hashedDist struct {
+	Type      string `json:"type"`
+	URL       string `json:"url"`
+	Reference string `json:"reference,omitempty"`
+	Shasum    string `json:"shasum,omitempty"`
+}
+
+func hashedPackages(packages map[string]LockedPackage) map[string]hashedPackage {
+	hashed := make(map[string]hashedPackage, len(packages))
+	for name, p := range packages {
+		hashed[name] = hashedPackage{
+			Version:  p.Version,
+			Dist:     hashedDist{Type: p.Dist.Type, URL: p.Dist.URL, Reference: p.Dist.Reference, Shasum: p.Dist.Digest},
+			Direct:   p.Direct,
+			Depends:  p.Depends,
+			External: p.ExternalModules,
+			Registry: p.IndexURL,
+			Index:    p.Index,
+		}
+	}
+	return hashed
 }
 
 func hashedIndexes(indexes manifest.Indexes) []manifest.Index {
@@ -147,8 +183,8 @@ func namedHash(require map[string]string, indexes manifest.Indexes, odoo string,
 		Require  map[string]string        `json:"require"`
 		Indexes  manifest.Indexes         `json:"indexes"`
 		Odoo     string                   `json:"odoo"`
-		Packages map[string]LockedPackage `json:"packages"`
-	}{Require: require, Indexes: indexes, Odoo: odoo, Packages: packages})
+		Packages map[string]hashedPackage `json:"packages"`
+	}{Require: require, Indexes: indexes, Odoo: odoo, Packages: hashedPackages(packages)})
 }
 
 // legacyHash is content_hash as odoopack computed it before the series was
@@ -157,8 +193,8 @@ func legacyHash(require map[string]string, indexes manifest.Indexes, packages ma
 	return hashJSON(struct {
 		Require  map[string]string        `json:"require"`
 		Indexes  manifest.Indexes         `json:"indexes"`
-		Packages map[string]LockedPackage `json:"packages"`
-	}{Require: require, Indexes: indexes, Packages: packages})
+		Packages map[string]hashedPackage `json:"packages"`
+	}{Require: require, Indexes: indexes, Packages: hashedPackages(packages)})
 }
 
 func hashJSON(payload any) (string, error) {
@@ -338,7 +374,7 @@ func (r *resolver) visit(queue []resolveItem) error {
 				if _, direct := r.require[dep]; direct {
 					continue
 				}
-				return fmt.Errorf("cannot resolve transitive dependency %q without an Odoo series; set \"odoo\" in the manifest", dep)
+				return fmt.Errorf("cannot resolve transitive dependency %q without an Odoo series; set \"odoo_series\" in the manifest", dep)
 			}
 			queue = append(queue, resolveItem{name: dep, req: requirement{constraint: r.odooSeries, path: path}, pinned: item.pinned})
 		}
@@ -352,7 +388,7 @@ func (r *resolver) lock(name string, req requirement, pinned bool) (LockedPackag
 		pkg.Direct = direct
 		// keeps found the index, so this replaces the name an older lockfile
 		// holds with its URL.
-		pkg.Registry, _ = index.LockedRegistry(r.indexes, pkg.LockedTo())
+		pkg.IndexURL, _ = index.LockedRegistry(r.indexes, pkg.LockedTo())
 		pkg.Index = ""
 		return pkg, nil
 	}
@@ -447,12 +483,12 @@ func lockPackage(lookup index.AddonVersion, direct bool, deps, external []string
 			Type:      lookup.Type,
 			URL:       lookup.Repository,
 			Reference: lookup.Reference,
-			Shasum:    lookup.Shasum,
+			Digest:    lookup.Shasum,
 		},
-		Direct:   direct,
-		Depends:  deps,
-		External: external,
-		Registry: lookup.Registry,
+		Direct:          direct,
+		Depends:         deps,
+		ExternalModules: external,
+		IndexURL:        lookup.Registry,
 	}
 	if err := pkg.Dist.CheckIntegrity(); err != nil {
 		return LockedPackage{}, fmt.Errorf("%s %s: %w", lookup.Name, lookup.Version, err)
@@ -461,14 +497,14 @@ func lockPackage(lookup index.AddonVersion, direct bool, deps, external []string
 }
 
 // CheckIntegrity reports whether d pins its content: a zip by its sha256
-// shasum, a git package by a full commit id.
+// digest, a git package by a full commit id.
 func (d Dist) CheckIntegrity() error {
 	switch d.Type {
 	case "zip":
-		if d.Shasum == "" {
-			return fmt.Errorf("zip has no shasum to verify it against")
+		if d.Digest == "" {
+			return fmt.Errorf("zip has no digest to verify it against")
 		}
-		_, err := digest.Parse(d.Shasum)
+		_, err := digest.Parse(d.Digest)
 		return err
 	case "git":
 		if d.Reference == "" {

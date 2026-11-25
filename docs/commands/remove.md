@@ -28,6 +28,6 @@ odoopack remove <addon>
    cannot remove acme/base-tools: acme/health-check depend(s) on it
    ```
 
-4. Like [install](install.md#the-odoopack-marker), it refuses an invalid `addons_path` or a non-empty one without the `.odoopack` marker.
+4. Like [install](install.md#the-odoopack-marker), it refuses an invalid `addons_dir` or a non-empty one without the `.odoopack` marker.
 5. Removes the requirement from `odoopack.json`, and the addon and every dependency that no remaining package needs from `odoopack.lock`, and recomputes the content hash.
 6. Deletes the directories of the removed packages from the addons path.

@@ -36,23 +36,23 @@ var requireCmd = &cobra.Command{
 
 		constraint := versionArg
 		if constraint == "" {
-			constraint = m.Odoo
+			constraint = m.OdooSeries
 		}
 		if constraint == "" {
-			fatal(fmt.Errorf("no version given and no \"odoo\" series set in the manifest; use %s@<version> (e.g. 19.0.1.0.0 or dev-19.0)", addonName))
+			fatal(fmt.Errorf("no version given and no \"odoo_series\" set in the manifest; use %s@<version> (e.g. 19.0.1.0.0 or dev-19.0)", addonName))
 		}
 
-		lookup, err := index.LookupLocked(m.Indexes, oldLock.Packages[addonName].LockedTo(), addonName, constraint, m.Odoo)
+		lookup, err := index.LookupLocked(m.Indexes, oldLock.Packages[addonName].LockedTo(), addonName, constraint, m.OdooSeries)
 		if err != nil {
 			fatal(err)
 		}
 
 		m.AddRequirement(lookup.Name, constraint)
-		lockFile, err := lockfile.RecomputeHash(m.Require, m.Indexes, m.Odoo, oldLock.Packages)
+		lockFile, err := lockfile.RecomputeHash(m.Require, m.Indexes, m.OdooSeries, oldLock.Packages)
 		if err != nil {
 			fatal(err)
 		}
-		if err := addonsdir.Claim(m.AddonsPath, lockedDirs(oldLock.Packages, lockFile.Packages)); err != nil {
+		if err := addonsdir.Claim(m.AddonsDir, lockedDirs(oldLock.Packages, lockFile.Packages)); err != nil {
 			fatal(err)
 		}
 		if err := manifest.Save(*m); err != nil {

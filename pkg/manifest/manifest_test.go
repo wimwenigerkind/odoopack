@@ -77,3 +77,32 @@ func TestSaveWritesFormatVersionFirst(t *testing.T) {
 		t.Fatalf("manifest does not start with %q:\n%s", want, data)
 	}
 }
+
+func TestLoadReadsLegacyKeys(t *testing.T) {
+	path := useManifest(t, `{"name":"test","odoo":"19.0","addons_path":"addons/custom"}`)
+
+	m, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.OdooSeries != "19.0" || m.AddonsDir != "addons/custom" {
+		t.Fatalf("got odoo_series %q and addons_dir %q, want the values of odoo and addons_path", m.OdooSeries, m.AddonsDir)
+	}
+	if err := Save(*m); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{`"odoo":`, `"addons_path":`} {
+		if bytes.Contains(data, []byte(key)) {
+			t.Errorf("manifest still has the legacy key %s:\n%s", key, data)
+		}
+	}
+	for _, key := range []string{`"odoo_series": "19.0"`, `"addons_dir": "addons/custom"`} {
+		if !bytes.Contains(data, []byte(key)) {
+			t.Errorf("manifest lacks %s:\n%s", key, data)
+		}
+	}
+}

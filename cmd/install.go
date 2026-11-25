@@ -42,7 +42,7 @@ var installCmd = &cobra.Command{
 		}
 		previous := lock
 
-		isStale, err := lockfile.IsStale(m.Require, m.Indexes, m.Odoo, lock.Packages, lock.ContentHash)
+		isStale, err := lockfile.IsStale(m.Require, m.Indexes, m.OdooSeries, lock.Packages, lock.ContentHash)
 		if err != nil {
 			fatal(err)
 		}
@@ -52,7 +52,7 @@ var installCmd = &cobra.Command{
 		}
 		if isStale {
 			ui.Info("lockfile is stale, resolving")
-			lock, err = lockfile.RecomputeHash(m.Require, m.Indexes, m.Odoo, lock.Packages)
+			lock, err = lockfile.RecomputeHash(m.Require, m.Indexes, m.OdooSeries, lock.Packages)
 			if err != nil {
 				fatal(err)
 			}
@@ -82,11 +82,11 @@ func frozenLockfileError() error {
 	return fmt.Errorf("%s is out of date with %s; %s", path, viper.GetString("manifest"), fix)
 }
 
-// installAll replaces addons_path with the packages in lock. previous is the
+// installAll replaces addons_dir with the packages in lock. previous is the
 // lockfile before this run resolved again: an install from an older odoopack
 // without the marker holds the addons of that one, and must still be adopted.
 func installAll(m *manifest.Manifest, lock, previous lockfile.LockFile) error {
-	if err := addonsdir.Clear(m.AddonsPath, lockedDirs(lock.Packages, previous.Packages)); err != nil {
+	if err := addonsdir.Clear(m.AddonsDir, lockedDirs(lock.Packages, previous.Packages)); err != nil {
 		return err
 	}
 
@@ -110,14 +110,14 @@ func installAll(m *manifest.Manifest, lock, previous lockfile.LockFile) error {
 	})
 }
 
-// checkAddonsPath runs before a command writes to addons_path, so that nothing
+// checkAddonsPath runs before a command writes to addons_dir, so that nothing
 // is created or deleted for an invalid one.
 func checkAddonsPath(m *manifest.Manifest) {
 	wd, err := os.Getwd()
 	if err != nil {
 		fatal(err)
 	}
-	if err := addonsdir.Check(wd, m.AddonsPath); err != nil {
+	if err := addonsdir.Check(wd, m.AddonsDir); err != nil {
 		fatal(err)
 	}
 }
@@ -137,7 +137,7 @@ func installOne(m *manifest.Manifest, name string, pkg lockfile.LockedPackage) e
 	if err != nil {
 		return err
 	}
-	return inst.Install(m.AddonsPath, name, pkg)
+	return inst.Install(m.AddonsDir, name, pkg)
 }
 
 func init() {

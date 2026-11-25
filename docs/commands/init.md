@@ -23,4 +23,4 @@ odoopack init [flags]
 
 ## Result
 
-The generated manifest contains the project name, an empty `require` map, an empty `indexes` map, and the default `addons_path` (`addons/odoopack`). See [Manifest](../reference/manifest.md).
+The generated manifest contains the project name, an empty `require` map, an empty `indexes` map, the `odoo_series` from `--odoo`, and the default `addons_dir` (`addons/odoopack`). See [Manifest](../reference/manifest.md).

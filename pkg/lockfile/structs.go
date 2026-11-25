@@ -1,33 +1,75 @@
 package lockfile
 
+import "encoding/json"
+
 type Dist struct {
 	Type      string `json:"type"`
 	URL       string `json:"url"`
 	Reference string `json:"reference,omitempty"`
-	Shasum    string `json:"shasum,omitempty"`
+	Digest    string `json:"digest,omitempty"`
+}
+
+// UnmarshalJSON also reads shasum, which releases before digest wrote.
+func (d *Dist) UnmarshalJSON(data []byte) error {
+	type plain Dist
+	var v struct {
+		plain
+		Shasum string `json:"shasum"`
+	}
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	*d = Dist(v.plain)
+	if d.Digest == "" {
+		d.Digest = v.Shasum
+	}
+	return nil
 }
 
 type LockedPackage struct {
-	Version  string   `json:"version"`
-	Dist     Dist     `json:"dist"`
-	Direct   bool     `json:"direct"`
-	Depends  []string `json:"depends,omitempty"`
-	External []string `json:"external,omitempty"`
-	// Registry is the normalized URL of the index the package was resolved
+	Version         string   `json:"version"`
+	Dist            Dist     `json:"dist"`
+	Direct          bool     `json:"direct"`
+	Depends         []string `json:"depends,omitempty"`
+	ExternalModules []string `json:"external_modules,omitempty"`
+	// IndexURL is the normalized URL of the index the package was resolved
 	// from, so that later resolutions ask that index only, whatever it is
 	// named in the manifest. Lockfiles written before the field existed lack
 	// it.
-	Registry string `json:"registry,omitempty"`
-	// Index is the name of that index, which lockfiles held before Registry.
-	// It is only read: resolving the package again writes Registry instead.
+	IndexURL string `json:"index_url,omitempty"`
+	// Index is the name of that index, which lockfiles held before IndexURL.
+	// It is only read: resolving the package again writes IndexURL instead.
 	Index string `json:"index,omitempty"`
+}
+
+// UnmarshalJSON also reads external and registry, which releases before
+// external_modules and index_url wrote. Save writes the new keys only, so the
+// old ones go away with the next write.
+func (p *LockedPackage) UnmarshalJSON(data []byte) error {
+	type plain LockedPackage
+	var v struct {
+		plain
+		External []string `json:"external"`
+		Registry string   `json:"registry"`
+	}
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	*p = LockedPackage(v.plain)
+	if p.ExternalModules == nil {
+		p.ExternalModules = v.External
+	}
+	if p.IndexURL == "" {
+		p.IndexURL = v.Registry
+	}
+	return nil
 }
 
 // LockedTo is what the package is locked to: the URL of its index or, in an
 // older lockfile, the name.
 func (p LockedPackage) LockedTo() string {
-	if p.Registry != "" {
-		return p.Registry
+	if p.IndexURL != "" {
+		return p.IndexURL
 	}
 	return p.Index
 }

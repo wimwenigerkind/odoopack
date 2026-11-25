@@ -11,7 +11,7 @@ By default the CLI looks for `$HOME/.odoopack.yaml`. Override the path with the 
 | Key | Default | Description |
 | --- | --- | --- |
 | `default_index_url` | `https://odoopack.dev` | Built-in registry tried last during resolution, after the indexes of the manifest. See [index](../commands/index-command.md#resolution-order). |
-| `addons_path` | `addons/odoopack` | Directory addons are installed into. Also stored per project in the manifest. |
+| `addons_path` | `addons/odoopack` | Directory addons are installed into. The manifest stores it per project as `addons_dir`. |
 | `manifest` | `odoopack.json` | Manifest filename. |
 | `lock` | `odoopack.lock` | Lockfile filename. |
 | `auth` | (unset) | Registry tokens. Set through the `ODOOPACK_AUTH` environment variable. |

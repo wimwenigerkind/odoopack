@@ -63,17 +63,17 @@ func addonZip(t *testing.T) lockfile.Dist {
 
 	viper.Set("no_cache", true)
 	t.Cleanup(viper.Reset)
-	return lockfile.Dist{Type: "zip", URL: srv.URL, Shasum: fmt.Sprintf("sha256:%x", sha256.Sum256(body))}
+	return lockfile.Dist{Type: "zip", URL: srv.URL, Digest: fmt.Sprintf("sha256:%x", sha256.Sum256(body))}
 }
 
 func TestInstallAllReplacesPreviousInstall(t *testing.T) {
 	dist := addonZip(t)
 	t.Chdir(t.TempDir())
 	m := manifest.NewManifest("test", "addons/odoopack", "19.0")
-	if err := addonsdir.Claim(m.AddonsPath, nil); err != nil {
+	if err := addonsdir.Claim(m.AddonsDir, nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Mkdir(filepath.Join(m.AddonsPath, "old_addon"), 0755); err != nil {
+	if err := os.Mkdir(filepath.Join(m.AddonsDir, "old_addon"), 0755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -84,11 +84,11 @@ func TestInstallAllReplacesPreviousInstall(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := os.Stat(filepath.Join(m.AddonsPath, "old_addon")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(m.AddonsDir, "old_addon")); !os.IsNotExist(err) {
 		t.Errorf("old_addon still exists: %v", err)
 	}
 	for _, name := range []string{addonsdir.MarkerName, filepath.Join("new_addon", "__manifest__.py")} {
-		if _, err := os.Stat(filepath.Join(m.AddonsPath, name)); err != nil {
+		if _, err := os.Stat(filepath.Join(m.AddonsDir, name)); err != nil {
 			t.Errorf("%s missing after install: %v", name, err)
 		}
 	}
@@ -98,7 +98,7 @@ func TestInstallAllAdoptsLegacyInstall(t *testing.T) {
 	dist := addonZip(t)
 	t.Chdir(t.TempDir())
 	m := manifest.NewManifest("test", "addons/odoopack", "19.0")
-	legacy := filepath.Join(m.AddonsPath, "new_addon", "legacy.py")
+	legacy := filepath.Join(m.AddonsDir, "new_addon", "legacy.py")
 	if err := os.MkdirAll(filepath.Dir(legacy), 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestInstallAllAdoptsLegacyInstall(t *testing.T) {
 		t.Errorf("legacy file still exists: %v", err)
 	}
 	for _, name := range []string{addonsdir.MarkerName, filepath.Join("new_addon", "__manifest__.py")} {
-		if _, err := os.Stat(filepath.Join(m.AddonsPath, name)); err != nil {
+		if _, err := os.Stat(filepath.Join(m.AddonsDir, name)); err != nil {
 			t.Errorf("%s missing after install: %v", name, err)
 		}
 	}
@@ -127,7 +127,7 @@ func TestInstallAllAdoptsLegacyInstallAfterResolvingAgain(t *testing.T) {
 	dist := addonZip(t)
 	t.Chdir(t.TempDir())
 	m := manifest.NewManifest("test", "addons/odoopack", "19.0")
-	dropped := filepath.Join(m.AddonsPath, "dropped_addon", "__init__.py")
+	dropped := filepath.Join(m.AddonsDir, "dropped_addon", "__init__.py")
 	if err := os.MkdirAll(filepath.Dir(dropped), 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +149,7 @@ func TestInstallAllAdoptsLegacyInstallAfterResolvingAgain(t *testing.T) {
 		t.Errorf("dropped_addon still exists: %v", err)
 	}
 	for _, name := range []string{addonsdir.MarkerName, filepath.Join("new_addon", "__manifest__.py")} {
-		if _, err := os.Stat(filepath.Join(m.AddonsPath, name)); err != nil {
+		if _, err := os.Stat(filepath.Join(m.AddonsDir, name)); err != nil {
 			t.Errorf("%s missing after install: %v", name, err)
 		}
 	}
