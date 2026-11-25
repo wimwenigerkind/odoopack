@@ -27,7 +27,7 @@ The lockfile pins the exact distribution of every requirement so that installs a
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `format_version` | integer | Version of the lockfile format, currently `1`. A lockfile without it is version 1. odoopack refuses a lockfile with a higher version than it knows and asks you to upgrade odoopack; it always writes the current version. Adding an optional field does not raise it. Not part of `content_hash`, so a lockfile does not become stale when it gains the field. Releases before `format_version` wrote the same number as `format`; odoopack still reads it and replaces it with `format_version` the next time it writes the lockfile. |
+| `format_version` | integer | Version of the lockfile format, currently `1`. A lockfile without it is version 1. odoopack refuses a lockfile with a higher version than it knows and asks you to upgrade odoopack; it always writes the current version. Adding an optional field does not raise it. Not part of `content_hash`, so a lockfile does not become stale when it gains the field. |
 | `content_hash` | string | `sha256:` hash of what the manifest resolves the packages from. Used to detect when the lockfile is stale relative to the manifest. See [Content hash](#content-hash). |
 | `packages` | object | Map of addon name to the locked package. |
 
@@ -43,16 +43,11 @@ The lockfile pins the exact distribution of every requirement so that installs a
 | `direct` | boolean | `true` when `odoopack.json` requires the package, `false` when it is only a dependency of another package. |
 | `depends` | array | Packages this package depends on. They are locked too. |
 | `external_modules` | array | Module names this package depends on that no index provides, such as the modules that ship with Odoo. |
-| `index_url` | string | URL of the index the package was resolved from, the built-in default registry included, with scheme and host in lower case and no trailing slash. Later resolutions ask this index only, as long as the manifest has an index with this URL, whatever its name. Missing in lockfiles written by earlier releases; such a package is resolved as if it were new. |
-| `index` | string | Name of the index the package was resolved from, written by releases before `index_url` existed. odoopack still reads it and replaces it with `index_url` the next time it writes the package. Rename an index only after the lockfile has been written with `index_url`, for example by `odoopack update`. |
+| `index_url` | string | URL of the index the package was resolved from, the built-in default registry included, with scheme and host in lower case and no trailing slash. Later resolutions ask this index only, as long as the manifest has an index with this URL, whatever its name. A package without it is resolved as if it were new. |
 
 ## Unknown keys
 
 odoopack writes the lockfile from scratch and does not keep keys it does not know. Keys are matched exactly, and a key that appears twice in one object is an error. A newer odoopack that adds an optional key writes it again on its next write. Keys of an index in the manifest that odoopack does not know are not part of `content_hash`.
-
-## Renamed keys
-
-Releases before format version 1 was frozen wrote `format` instead of `format_version`, `dist.shasum` instead of `dist.digest`, `external` instead of `external_modules` and `registry` instead of `index_url`. odoopack still reads them and writes the new keys the next time it writes the lockfile. The renaming does not change `content_hash`, so such a lockfile is not stale and `install --frozen-lockfile` keeps working.
 
 ## Resolution
 
@@ -91,8 +86,6 @@ For example, a manifest with `"odoo_series": "19.0"`, `"require": {"acme/health-
 ```
 
 The name and position of an index, keys odoopack does not know, `name`, `addons_dir`, `extra` and `format_version` are not part of it: none of them changes what a package resolves to, since a package is locked to the URL of its index. The locked packages are not part of it either; `dist.digest` and `dist.reference` pin their content.
-
-Lockfiles written by earlier releases hold a hash that also covered the locked packages. odoopack still accepts it as fresh and writes the hash above the next time it writes the lockfile.
 
 ## Staleness
 

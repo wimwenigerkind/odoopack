@@ -68,28 +68,27 @@ func NormalizeURL(raw string) string {
 	return u.String()
 }
 
-// locatedBy reports whether locked points at idx. A package is locked to
-// the URL of its index, so renaming the index does not change the lockfile.
-// Lockfiles written before that hold the name of the index instead.
+// locatedBy reports whether a package locked to the index URL locked comes
+// from idx. A package is locked to the URL, so renaming the index does not
+// change the lockfile.
 func locatedBy(idx manifest.Index, locked string) bool {
-	return locked != "" && (NormalizeURL(idx.Url) == locked || idx.Name == locked)
+	return locked != "" && NormalizeURL(idx.Url) == locked
 }
 
-// LockedRegistry returns the normalized URL of the index LookupLocked asks
-// for a package locked to locked, and false when no index searched matches.
-func LockedRegistry(indexes manifest.Indexes, locked string) (string, bool) {
+// HasIndex reports whether indexes still have the index a package is locked
+// to by its URL.
+func HasIndex(indexes manifest.Indexes, locked string) bool {
 	for _, idx := range indexes {
 		if locatedBy(idx, locked) {
-			return NormalizeURL(idx.Url), true
+			return true
 		}
 	}
-	return "", false
+	return false
 }
 
-// LookupLocked resolves an addon from the index locked points at only, when
-// that index still exists. locked is the URL of the index or, in a lockfile
-// written before URLs were locked, its name. Otherwise it tries the indexes
-// of the manifest in their order.
+// LookupLocked resolves an addon from the index with the URL locked only,
+// when that index still exists. Otherwise it tries the indexes of the
+// manifest in their order.
 func LookupLocked(indexes manifest.Indexes, locked, name, constraint, odooSeries string) (AddonVersion, error) {
 	for _, idx := range indexes {
 		if !locatedBy(idx, locked) {

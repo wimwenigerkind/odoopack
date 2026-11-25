@@ -207,7 +207,7 @@ func TestInstallRejectsInvalidLockfileName(t *testing.T) {
 	}
 
 	dir, out := installInChild(t, map[string]string{
-		"odoopack.json": `{"name":"test","odoo":"19.0","require":{"acme/health-check":"19.0"},"addons_path":"addons/odoopack"}`,
+		"odoopack.json": `{"name":"test","odoo_series":"19.0","require":{"acme/health-check":"19.0"},"indexes":[],"addons_dir":"addons/odoopack"}`,
 		"odoopack.lock": `{"content_hash":"sha256:00","packages":{"../evil":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/x.git"}}}}`,
 		filepath.Join("addons", "odoopack", addonsdir.MarkerName):                   "",
 		filepath.Join("addons", "odoopack", "acme_health_check", "__manifest__.py"): "{}",
@@ -226,7 +226,7 @@ func TestInstallRejectsModuleCollision(t *testing.T) {
 	}
 
 	// The content hash is stale on purpose: install must stop before it would
-	// resolve again, clear addons_path or download anything.
+	// resolve again, clear addons_dir or download anything.
 	_, out := installInChild(t, map[string]string{
 		"odoopack.json": unreachableManifest,
 		"odoopack.lock": `{"content_hash":"sha256:00","packages":{"acme/health-check":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/x.git"}},"acme/health_check":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/y.git"}}}}`,
@@ -246,7 +246,7 @@ func TestInstallRejectsNewerLockfileFormat(t *testing.T) {
 	// The content hash is stale on purpose: install must stop before it would
 	// resolve again and overwrite the lockfile.
 	_, out := installInChild(t, map[string]string{
-		"odoopack.json": `{"name":"test","odoo":"19.0","require":{"acme/health-check":"19.0"},"addons_path":"addons/odoopack"}`,
+		"odoopack.json": `{"name":"test","odoo_series":"19.0","require":{"acme/health-check":"19.0"},"indexes":[],"addons_dir":"addons/odoopack"}`,
 		"odoopack.lock": `{"format_version":2,"content_hash":"sha256:00","packages":{"acme/health-check":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/x.git"}}}}`,
 		filepath.Join("addons", "odoopack", addonsdir.MarkerName):                   "",
 		filepath.Join("addons", "odoopack", "acme_health_check", "__manifest__.py"): "{}",
@@ -258,7 +258,7 @@ func TestInstallRejectsNewerLockfileFormat(t *testing.T) {
 
 // unreachableManifest has one index that refuses connections, so that a test
 // which resolves again fails without reaching the network.
-const unreachableManifest = `{"name":"test","odoo":"19.0","require":{"acme/health-check":"19.0"},"indexes":{"default":{"url":"http://127.0.0.1:1","type":"registry"}},"addons_path":"addons/odoopack"}`
+const unreachableManifest = `{"name":"test","odoo_series":"19.0","require":{"acme/health-check":"19.0"},"indexes":[{"name":"default","url":"http://127.0.0.1:1","type":"registry"}],"addons_dir":"addons/odoopack"}`
 
 // staleLockfile locks acme/health-check, but its content hash matches nothing.
 const staleLockfile = `{"format_version":1,"content_hash":"sha256:00","packages":{"acme/health-check":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/x.git"},"direct":true}}}`

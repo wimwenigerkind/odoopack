@@ -2,7 +2,6 @@ package manifest
 
 import (
 	"encoding/json/jsontext"
-	"encoding/json/v2"
 	"sort"
 )
 
@@ -24,8 +23,7 @@ type Index struct {
 // decides which registry a name resolves to when two have it.
 type Indexes []Index
 
-// DefaultIndexName is the name init gives the built-in default registry,
-// and the name an index from releases that searched it implicitly gets.
+// DefaultIndexName is the name init gives the built-in default registry.
 const DefaultIndexName = "default"
 
 // Find returns the position of the index named name, or -1.
@@ -86,58 +84,6 @@ type Manifest struct {
 	// Unknown holds the top-level keys this odoopack does not know, so that
 	// Save writes back what a newer odoopack added.
 	Unknown map[string]jsontext.Value `json:",embed"`
-	// legacyIndexes is set when indexes were missing or an object, written
-	// by a release that searched the default registry implicitly.
-	legacyIndexes bool
-}
-
-// UnmarshalJSON also reads what releases before format version 1 was frozen
-// wrote: odoo and addons_path, which are now odoo_series and addons_dir, and
-// indexes as an object by name, which those releases searched in
-// alphabetical order. Save writes the current form only, so the old one goes
-// away with the next write.
-func (m *Manifest) UnmarshalJSON(data []byte) error {
-	type plain Manifest
-	var v struct {
-		plain
-		// Indexes is shallower than plain.Indexes and takes its key, so that
-		// either form can be told apart before it is decoded.
-		Indexes    jsontext.Value `json:"indexes"`
-		Odoo       string         `json:"odoo"`
-		AddonsPath string         `json:"addons_path"`
-	}
-	if err := json.Unmarshal(data, &v); err != nil {
-		return err
-	}
-	*m = Manifest(v.plain)
-	if m.OdooSeries == "" {
-		m.OdooSeries = v.Odoo
-	}
-	if m.AddonsDir == "" {
-		m.AddonsDir = v.AddonsPath
-	}
-
-	switch v.Indexes.Kind() {
-	case '[':
-		return json.Unmarshal(v.Indexes, &m.Indexes)
-	case '{':
-		var byName map[string]Index
-		if err := json.Unmarshal(v.Indexes, &byName); err != nil {
-			return err
-		}
-		names := make([]string, 0, len(byName))
-		for name := range byName {
-			names = append(names, name)
-		}
-		sort.Strings(names)
-		for _, name := range names {
-			idx := byName[name]
-			idx.Name = name
-			m.Indexes = append(m.Indexes, idx)
-		}
-	}
-	m.legacyIndexes = true
-	return nil
 }
 
 // UnknownKeys lists the keys of m this odoopack does not know, the keys of
@@ -154,22 +100,6 @@ func (m Manifest) UnknownKeys() []string {
 	}
 	sort.Strings(keys)
 	return keys
-}
-
-// migrateIndexes makes the default registry, which releases before the
-// array of indexes searched after the others unless an index was named
-// default or had its URL, an index of its own, so that resolution stays the
-// same.
-func (m *Manifest) migrateIndexes(defaultURL string) {
-	if !m.legacyIndexes || defaultURL == "" || m.Indexes.Find(DefaultIndexName) >= 0 {
-		return
-	}
-	for _, idx := range m.Indexes {
-		if idx.Url == defaultURL {
-			return
-		}
-	}
-	m.Indexes = append(m.Indexes, Index{Name: DefaultIndexName, Url: defaultURL, Type: "registry"})
 }
 
 func NewManifest(name, addonsDir, odooSeries string) *Manifest {

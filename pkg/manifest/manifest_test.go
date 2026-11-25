@@ -15,7 +15,7 @@ func TestLoadRejectsInvalidName(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "odoopack.json")
 	viper.Set("manifest", path)
 	t.Cleanup(viper.Reset)
-	if err := os.WriteFile(path, []byte(`{"name":"test","require":{"acme/../evil":"19.0"},"addons_path":"addons/odoopack"}`), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(`{"name":"test","odoo_series":"19.0","require":{"acme/../evil":"19.0"},"addons_dir":"addons/odoopack"}`), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -39,7 +39,7 @@ func useManifest(t *testing.T, content string) string {
 }
 
 func TestLoadWithoutFormatVersionIsOne(t *testing.T) {
-	useManifest(t, `{"name":"test","odoo":"19.0","addons_path":"addons/odoopack"}`)
+	useManifest(t, `{"name":"test","odoo_series":"19.0","addons_dir":"addons/odoopack"}`)
 
 	m, err := Load()
 	if err != nil {
@@ -51,7 +51,7 @@ func TestLoadWithoutFormatVersionIsOne(t *testing.T) {
 }
 
 func TestLoadRejectsNewerFormatVersion(t *testing.T) {
-	path := useManifest(t, fmt.Sprintf(`{"format_version":%d,"name":"test","odoo":"19.0","addons_path":"addons/odoopack"}`, FormatVersion+1))
+	path := useManifest(t, fmt.Sprintf(`{"format_version":%d,"name":"test","odoo_series":"19.0","addons_dir":"addons/odoopack"}`, FormatVersion+1))
 
 	_, err := Load()
 	if err == nil || !strings.Contains(err.Error(), path) || !strings.Contains(err.Error(), "upgrade odoopack") {
@@ -60,7 +60,7 @@ func TestLoadRejectsNewerFormatVersion(t *testing.T) {
 }
 
 func TestSaveWritesFormatVersionFirst(t *testing.T) {
-	path := useManifest(t, `{"name":"test","odoo":"19.0","addons_path":"addons/odoopack"}`)
+	path := useManifest(t, `{"name":"test","odoo_series":"19.0","addons_dir":"addons/odoopack"}`)
 
 	m, err := Load()
 	if err != nil {
@@ -75,35 +75,6 @@ func TestSaveWritesFormatVersionFirst(t *testing.T) {
 	}
 	if want := fmt.Sprintf("{\n  \"format_version\": %d,\n", FormatVersion); !bytes.HasPrefix(data, []byte(want)) {
 		t.Fatalf("manifest does not start with %q:\n%s", want, data)
-	}
-}
-
-func TestLoadReadsLegacyKeys(t *testing.T) {
-	path := useManifest(t, `{"name":"test","odoo":"19.0","addons_path":"addons/custom"}`)
-
-	m, err := Load()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if m.OdooSeries != "19.0" || m.AddonsDir != "addons/custom" {
-		t.Fatalf("got odoo_series %q and addons_dir %q, want the values of odoo and addons_path", m.OdooSeries, m.AddonsDir)
-	}
-	if err := Save(*m); err != nil {
-		t.Fatal(err)
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, key := range []string{`"odoo":`, `"addons_path":`} {
-		if bytes.Contains(data, []byte(key)) {
-			t.Errorf("manifest still has the legacy key %s:\n%s", key, data)
-		}
-	}
-	for _, key := range []string{`"odoo_series": "19.0"`, `"addons_dir": "addons/custom"`} {
-		if !bytes.Contains(data, []byte(key)) {
-			t.Errorf("manifest lacks %s:\n%s", key, data)
-		}
 	}
 }
 
@@ -174,18 +145,6 @@ func TestLoadRejectsExtraThatIsNotAnObject(t *testing.T) {
 
 	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "extra must be an object") {
 		t.Fatalf("got error %v, want one about extra", err)
-	}
-}
-
-func TestLegacyKeysAreNotUnknown(t *testing.T) {
-	useManifest(t, `{"name":"test","odoo":"19.0","addons_path":"addons/odoopack"}`)
-
-	m, err := Load()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if keys := m.UnknownKeys(); len(keys) != 0 {
-		t.Fatalf("got unknown keys %v, want none", keys)
 	}
 }
 

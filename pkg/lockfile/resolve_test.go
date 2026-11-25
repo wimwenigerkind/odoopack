@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"reflect"
 	"strings"
 	"sync/atomic"
@@ -92,8 +91,8 @@ func TestRecomputeHashResolvesLockedFromItsIndex(t *testing.T) {
 		{Name: "b", Url: second, Type: "registry"},
 	}
 	locked := map[string]LockedPackage{
-		"acme/health-check": {Index: "b"},
-		"acme/base-tools":   {Index: "b"},
+		"acme/health-check": {IndexURL: second},
+		"acme/base-tools":   {IndexURL: second},
 	}
 
 	lf, err := RecomputeHash(map[string]string{"acme/health-check": "19.0"}, indexes, "19.0", locked)
@@ -101,8 +100,8 @@ func TestRecomputeHashResolvesLockedFromItsIndex(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, pkg := range lf.Packages {
-		if pkg.IndexURL != second || pkg.Index != "" {
-			t.Errorf("%s locked to %q (index %q), want only the URL of b (%s)", name, pkg.IndexURL, pkg.Index, second)
+		if pkg.IndexURL != second {
+			t.Errorf("%s locked to %q, want the URL of b (%s)", name, pkg.IndexURL, second)
 		}
 	}
 	if n := firstHits.Load(); n != 0 {
@@ -132,52 +131,22 @@ func TestRecomputeHashWithLockfileWithoutIndex(t *testing.T) {
 	}
 }
 
-func TestLockfileWithoutIndexKeepsContentHash(t *testing.T) {
-	require := map[string]string{"acme/health-check": "19.0"}
-	indexes := manifest.Indexes{{Name: "company", Url: "https://registry.example.com", Type: "registry"}}
-	packages := map[string]LockedPackage{
-		"acme/health-check": {Version: "19.0.1.0.0", Dist: Dist{Type: "git", URL: "https://example.com/x.git"}, Direct: true},
-	}
-	hash, err := packagesHash(require, indexes, "19.0", packages)
-	if err != nil {
-		t.Fatal(err)
-	}
-	path := useLock(t, `{"format_version":1,"content_hash":"`+hash+`","packages":{"acme/health-check":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/x.git"},"direct":true}}}`)
-
-	old, err := Load()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if stale, err := IsStale(require, indexes, "19.0", old.Packages, old.ContentHash); err != nil || stale {
-		t.Fatalf("lockfile without index is stale (%v, %v)", stale, err)
-	}
-	if err := Save(old); err != nil {
-		t.Fatal(err)
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(string(data), `"index"`) {
-		t.Fatalf("saving a loaded lockfile added the index field:\n%s", data)
-	}
-}
-
 func release(version string, depends ...string) registryapi.Version {
 	v := addon("acme/any", depends...).Versions[0]
 	v.Version = version
 	return v
 }
 
-// locked is a package locked to index a with the dist release serves.
-func locked(version string, direct bool, depends ...string) LockedPackage {
+// locked is a package locked to the index at indexURL with the dist release
+// serves.
+func locked(indexURL, version string, direct bool, depends ...string) LockedPackage {
 	v := release(version)
 	return LockedPackage{
-		Version: version,
-		Dist:    Dist{Type: v.Type, URL: v.URL, Digest: v.Shasum},
-		Direct:  direct,
-		Depends: depends,
-		Index:   "a",
+		Version:  version,
+		Dist:     Dist{Type: v.Type, URL: v.URL, Digest: v.Shasum},
+		Direct:   direct,
+		Depends:  depends,
+		IndexURL: indexURL,
 	}
 }
 
@@ -201,10 +170,10 @@ func TestUpdateResolvesTreeAndKeepsOthers(t *testing.T) {
 	)
 	require := map[string]string{"acme/health-check": "19.0", "acme/other": "19.0"}
 	old := map[string]LockedPackage{
-		"acme/health-check": locked("19.0.1.0.0", true, "acme/old-dep"),
-		"acme/old-dep":      locked("19.0.1.0.0", false),
-		"acme/other":        locked("19.0.1.0.0", true, "acme/shared"),
-		"acme/shared":       locked("19.0.1.0.0", false),
+		"acme/health-check": locked(indexes[0].Url, "19.0.1.0.0", true, "acme/old-dep"),
+		"acme/old-dep":      locked(indexes[0].Url, "19.0.1.0.0", false),
+		"acme/other":        locked(indexes[0].Url, "19.0.1.0.0", true, "acme/shared"),
+		"acme/shared":       locked(indexes[0].Url, "19.0.1.0.0", false),
 	}
 
 	lf, err := Update(require, indexes, "19.0", old, "acme/health-check")
@@ -236,10 +205,10 @@ func TestUpdateResolvesTreeAndKeepsOthers(t *testing.T) {
 func TestRelockKeepsLockedAndDropsOrphans(t *testing.T) {
 	indexes, hits := singleIndex(t)
 	old := map[string]LockedPackage{
-		"acme/health-check": locked("19.0.1.0.0", true, "acme/base-tools", "acme/shared"),
-		"acme/base-tools":   locked("19.0.1.0.0", false),
-		"acme/other":        locked("19.0.1.0.0", true, "acme/shared"),
-		"acme/shared":       locked("19.0.1.0.0", false),
+		"acme/health-check": locked(indexes[0].Url, "19.0.1.0.0", true, "acme/base-tools", "acme/shared"),
+		"acme/base-tools":   locked(indexes[0].Url, "19.0.1.0.0", false),
+		"acme/other":        locked(indexes[0].Url, "19.0.1.0.0", true, "acme/shared"),
+		"acme/shared":       locked(indexes[0].Url, "19.0.1.0.0", false),
 	}
 
 	lf, err := Relock(map[string]string{"acme/other": "19.0"}, indexes, "19.0", old)
@@ -260,7 +229,7 @@ func TestRelockResolvesEntryWithoutDirect(t *testing.T) {
 		registryapi.Addon{Name: "acme/base-tools", Versions: []registryapi.Version{release("19.0.1.0.0")}},
 	)
 	// An update before direct and depends were kept wrote entries like this.
-	old := map[string]LockedPackage{"acme/health-check": locked("19.0.1.0.0", false)}
+	old := map[string]LockedPackage{"acme/health-check": locked(indexes[0].Url, "19.0.1.0.0", false)}
 
 	lf, err := Relock(map[string]string{"acme/health-check": "19.0"}, indexes, "19.0", old)
 	if err != nil {
@@ -352,9 +321,7 @@ func TestRelockKeepsPackageFromLastIndex(t *testing.T) {
 	public, publicHits := registry(t)
 	indexes = append(indexes, manifest.Index{Name: manifest.DefaultIndexName, Url: public, Type: "registry"})
 
-	fromDefault := locked("19.0.1.0.0", true)
-	fromDefault.Index = ""
-	fromDefault.IndexURL = public
+	fromDefault := locked(public, "19.0.1.0.0", true)
 	old := map[string]LockedPackage{"acme/public-tools": fromDefault}
 
 	lf, err := Relock(map[string]string{"acme/public-tools": "19.0"}, indexes, "19.0", old)
@@ -372,8 +339,8 @@ func TestRelockKeepsPackageFromLastIndex(t *testing.T) {
 func TestRelockRefusesModuleCollision(t *testing.T) {
 	indexes, _ := singleIndex(t)
 	old := map[string]LockedPackage{
-		"acme/health-check": locked("19.0.1.0.0", true),
-		"acme/health_check": locked("19.0.1.0.0", true),
+		"acme/health-check": locked(indexes[0].Url, "19.0.1.0.0", true),
+		"acme/health_check": locked(indexes[0].Url, "19.0.1.0.0", true),
 	}
 	_, err := Relock(map[string]string{"acme/health-check": "19.0", "acme/health_check": "19.0"}, indexes, "19.0", old)
 	if err == nil || !strings.Contains(err.Error(), "acme_health_check") {
@@ -408,37 +375,10 @@ func TestRenamedIndexKeepsLockfile(t *testing.T) {
 	}
 }
 
-func TestLockfileWithIndexNameIsWrittenBackWithRegistry(t *testing.T) {
-	indexes, hits := singleIndex(t)
-	require := map[string]string{"acme/health-check": "19.0"}
-	old := map[string]LockedPackage{"acme/health-check": locked("19.0.1.0.0", true)}
-
-	hash, err := namedHash(require, indexes, "19.0", old)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if stale, err := IsStale(require, indexes, "19.0", old, hash); err != nil || stale {
-		t.Fatalf("a lockfile hashed with index names is stale (%v, %v)", stale, err)
-	}
-
-	lf, err := Relock(require, indexes, "19.0", old)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := lf.Packages["acme/health-check"]; got.IndexURL != indexes[0].Url || got.Index != "" || got.Version != "19.0.1.0.0" {
-		t.Errorf("locked %+v, want the package kept with the URL of index a (%s)", got, indexes[0].Url)
-	}
-	if n := hits.Load(); n != 0 {
-		t.Errorf("rewriting the index name sent %d request(s)", n)
-	}
-}
-
 func TestChangedRegistryURLResolvesAgain(t *testing.T) {
 	served := registryapi.Addon{Name: "acme/health-check", Versions: []registryapi.Version{release("19.0.1.0.0")}}
 	indexes, hits := singleIndex(t, served)
-	moved := locked("19.0.1.0.0", true)
-	moved.Index = ""
-	moved.IndexURL = "https://old.example.com"
+	moved := locked("https://old.example.com", "19.0.1.0.0", true)
 
 	lf, err := Relock(map[string]string{"acme/health-check": "19.0"}, indexes, "19.0", map[string]LockedPackage{"acme/health-check": moved})
 	if err != nil {

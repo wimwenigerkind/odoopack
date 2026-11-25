@@ -175,14 +175,12 @@ func TestLookupLockedAsksOnlyItsIndex(t *testing.T) {
 		{Name: "b", Url: second, Type: "registry"},
 	}
 
-	for _, locked := range []string{second, "b"} {
-		got, err := LookupLocked(indexes, locked, "acme/health-check", "19.0", "19.0")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got.Registry != second || firstHits.Load() != 0 {
-			t.Fatalf("locked to %q: resolved from %q with %d request(s) to a, want b only", locked, got.Registry, firstHits.Load())
-		}
+	got, err := LookupLocked(indexes, second, "acme/health-check", "19.0", "19.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Registry != second || firstHits.Load() != 0 {
+		t.Fatalf("resolved from %q with %d request(s) to a, want b only", got.Registry, firstHits.Load())
 	}
 }
 
@@ -224,7 +222,7 @@ func TestLookupLockedDoesNotFallThrough(t *testing.T) {
 		{Name: "b", Url: second, Type: "registry"},
 	}
 
-	_, err := LookupLocked(indexes, "b", "acme/health-check", "19.0", "19.0")
+	_, err := LookupLocked(indexes, second, "acme/health-check", "19.0", "19.0")
 	if err == nil || !strings.Contains(err.Error(), "locked to index b") {
 		t.Fatalf("got error %v, want one naming the locked index b", err)
 	}
@@ -233,7 +231,7 @@ func TestLookupLockedDoesNotFallThrough(t *testing.T) {
 func TestLookupLockedToRemovedIndexResolvesAgain(t *testing.T) {
 	first, _ := registry(t, serving)
 
-	got, err := LookupLocked(manifest.Indexes{{Name: "a", Url: first, Type: "registry"}}, "gone", "acme/health-check", "19.0", "19.0")
+	got, err := LookupLocked(manifest.Indexes{{Name: "a", Url: first, Type: "registry"}}, "https://gone.example.com", "acme/health-check", "19.0", "19.0")
 	if err != nil {
 		t.Fatal(err)
 	}

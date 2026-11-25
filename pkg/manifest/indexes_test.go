@@ -17,36 +17,6 @@ func names(ix Indexes) string {
 	return strings.Join(list, ",")
 }
 
-func TestLoadMigratesIndexObject(t *testing.T) {
-	const public = "https://odoopack.example.com"
-	tests := []struct {
-		name    string
-		indexes string
-		want    string
-	}{
-		{"sorted, default appended", `"indexes":{"zeta":{"url":"https://z.example.com","type":"registry"},"alpha":{"url":"https://a.example.com","type":"registry"}},`, "alpha=https://a.example.com,zeta=https://z.example.com,default=" + public},
-		{"empty", `"indexes":{},`, "default=" + public},
-		{"missing", ``, "default=" + public},
-		{"named default", `"indexes":{"default":{"url":"https://mirror.example.com","type":"registry"}},`, "default=https://mirror.example.com"},
-		{"default url", `"indexes":{"public":{"url":"` + public + `","type":"registry"}},`, "public=" + public},
-		{"array", `"indexes":[{"name":"company","url":"https://registry.example.com","type":"registry"}],`, "company=https://registry.example.com"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			useManifest(t, `{"name":"test",`+tt.indexes+`"odoo_series":"19.0","addons_dir":"addons/odoopack"}`)
-			viper.Set("default_index_url", public)
-
-			m, err := Load()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got := names(m.Indexes); got != tt.want {
-				t.Fatalf("got indexes %s, want %s", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestLoadRejectsInvalidIndexNames(t *testing.T) {
 	for _, indexes := range []string{
 		`[{"url":"https://a.example.com","type":"registry"}]`,

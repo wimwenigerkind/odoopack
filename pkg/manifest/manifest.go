@@ -27,13 +27,12 @@ func Load() (*Manifest, error) {
 
 	var manifest Manifest
 	if err := json.Unmarshal(data, &manifest); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: %w", viper.GetString("manifest"), err)
 	}
 	manifest.FormatVersion, err = helper.CheckFormatVersion(viper.GetString("manifest"), manifest.FormatVersion, FormatVersion)
 	if err != nil {
 		return nil, err
 	}
-	manifest.migrateIndexes(viper.GetString("default_index_url"))
 	// Save keeps these keys, so a key a newer odoopack added survives a
 	// write by this one. The warning catches a misspelt key, which would
 	// otherwise be ignored silently.

@@ -11,7 +11,7 @@ func TestPlan(t *testing.T) {
 	moved := v1
 	moved.Dist.Digest = "sha256:03"
 	reindexed := v1
-	reindexed.Index = "company"
+	reindexed.IndexURL = "https://registry.example.com"
 	reindexed.Direct = true
 	reindexed.Depends = []string{"acme/base-tools"}
 

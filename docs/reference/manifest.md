@@ -66,13 +66,3 @@ odoopack keeps every key it does not know, at the top level and in an index, and
 Put data of your own under `extra` instead, which odoopack never warns about.
 
 odoopack writes the known keys in the order of the table above and the unknown keys after them, sorted by name. A new optional key does not raise `format_version`; only a change an older odoopack would misread does.
-
-## Renamed keys
-
-Releases before format version 1 was frozen wrote `odoo` instead of `odoo_series` and `addons_path` instead of `addons_dir`. odoopack still reads both and writes the new keys the next time it writes the manifest.
-
-## Indexes as an object
-
-Releases before format version 1 was frozen wrote `indexes` as an object of indexes by name, searched them in alphabetical order, and then searched the built-in default registry (`default_index_url`) unless an index was named `default` or had its URL. odoopack still reads that form: it lists the indexes in alphabetical order and adds the default registry as the last index named `default` where those releases searched it, so resolution stays the same. The next write stores the array.
-
-Since the default registry then becomes part of `content_hash`, a lockfile written before is stale once. `odoopack install --frozen-lockfile` fails until the lockfile is written again. `odoopack install` writes it, but resolves every package again from the index it is locked to, so a requirement on a series such as `19.0` can move to a newer release; review the lockfile diff before you commit it.
