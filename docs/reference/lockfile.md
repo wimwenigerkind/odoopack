@@ -47,7 +47,7 @@ The lockfile pins the exact distribution of every requirement so that installs a
 
 ## Unknown keys
 
-odoopack writes the lockfile from scratch and does not keep keys it does not know. Keys are matched exactly, and a key that appears twice in one object is an error. A newer odoopack that adds an optional key writes it again on its next write. Keys of an index in the manifest that odoopack does not know are not part of `content_hash`.
+odoopack writes the lockfile from scratch, indented by two spaces, with a trailing newline and through a temporary file it renames, and does not keep keys it does not know. Keys are matched exactly, and a key that appears twice in one object is an error. A newer odoopack that adds an optional key writes it again on its next write. Keys of an index in the manifest that odoopack does not know are not part of `content_hash`.
 
 ## Resolution
 

@@ -65,4 +65,4 @@ odoopack keeps every key it does not know, at the top level and in an index, and
 
 Put data of your own under `extra` instead, which odoopack never warns about.
 
-odoopack writes the known keys in the order of the table above and the unknown keys after them, sorted by name. A new optional key does not raise `format_version`; only a change an older odoopack would misread does.
+odoopack writes the known keys in the order of the table above and the unknown keys after them, sorted by name, indented by two spaces and with a trailing newline. It writes to a temporary file and renames it, so the manifest is never left half written. A new optional key does not raise `format_version`; only a change an older odoopack would misread does.
