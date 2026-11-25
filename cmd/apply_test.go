@@ -228,7 +228,7 @@ func TestRemoveRefusesWhileDependedOn(t *testing.T) {
 
 	shasum := "sha256:ece96e65881389c3ef6538ea26b9d7149e8e0af042c828d17283c6b76c633543"
 	dist := lockfile.Dist{Type: "zip", URL: "https://example.com/x.zip", Shasum: shasum}
-	lock, err := json.Marshal(lockfile.LockFile{Format: lockfile.Format, ContentHash: "sha256:00", Packages: map[string]lockfile.LockedPackage{
+	lock, err := json.Marshal(lockfile.LockFile{FormatVersion: lockfile.FormatVersion, ContentHash: "sha256:00", Packages: map[string]lockfile.LockedPackage{
 		"acme/health-check": lockedAt(dist, "19.0.1.0.0", true, "acme/base-tools"),
 		"acme/base-tools":   lockedAt(dist, "19.0.1.0.0", true),
 		"acme/other":        lockedAt(dist, "19.0.1.0.0", true, "acme/base-tools"),

@@ -6,7 +6,7 @@ The lockfile pins the exact distribution of every requirement so that installs a
 
 ```json
 {
-  "format": 1,
+  "format_version": 1,
   "content_hash": "sha256:1976680cba9b714f50256eb050427a4b9d0a7ab12e5ed82fe104d6d797ca2f35",
   "packages": {
     "acme/health-check": {
@@ -27,7 +27,7 @@ The lockfile pins the exact distribution of every requirement so that installs a
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `format` | integer | Version of the lockfile format, currently `1`. A lockfile without it is format 1. odoopack refuses a lockfile with a higher format than it knows and asks you to upgrade odoopack; it always writes the current format. Not part of `content_hash`, so a lockfile does not become stale when it gains the field. |
+| `format_version` | integer | Version of the lockfile format, currently `1`. A lockfile without it is version 1. odoopack refuses a lockfile with a higher version than it knows and asks you to upgrade odoopack; it always writes the current version. Adding an optional field does not raise it. Not part of `content_hash`, so a lockfile does not become stale when it gains the field. Releases before `format_version` wrote the same number as `format`; odoopack still reads it and replaces it with `format_version` the next time it writes the lockfile. |
 | `content_hash` | string | `sha256:` hash of the requirements, the URL and type of each index, the `odoo` series, and the locked packages. Used to detect when the lockfile is stale relative to the manifest. Index names are not part of it, so renaming an index does not make the lockfile stale. |
 | `packages` | object | Map of addon name to the locked package. |
 

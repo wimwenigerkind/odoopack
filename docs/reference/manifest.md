@@ -6,6 +6,7 @@ The manifest describes your project: which addons it requires and which registri
 
 ```json
 {
+  "format_version": 1,
   "name": "my-project",
   "require": {
     "acme/health-check": "19.0.1.0.0"
@@ -24,6 +25,7 @@ The manifest describes your project: which addons it requires and which registri
 
 | Field | Type | Description |
 | --- | --- | --- |
+| `format_version` | integer | Version of the manifest format, currently `1`. A manifest without it is version 1. odoopack refuses a manifest with a higher version than it knows and asks you to upgrade odoopack; it always writes the current version. Adding an optional field does not raise it. Not part of the lockfile's `content_hash`. |
 | `name` | string | Project name. |
 | `require` | object | Map of addon name to pinned version. The version is an exact string, not a range. |
 | `indexes` | object | Map of index name to `{ url, type }`. Registries to resolve addons from. |

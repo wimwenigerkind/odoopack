@@ -247,7 +247,7 @@ func TestInstallRejectsNewerLockfileFormat(t *testing.T) {
 	// resolve again and overwrite the lockfile.
 	_, out := installInChild(t, map[string]string{
 		"odoopack.json": `{"name":"test","odoo":"19.0","require":{"acme/health-check":"19.0"},"addons_path":"addons/odoopack"}`,
-		"odoopack.lock": `{"format":2,"content_hash":"sha256:00","packages":{"acme/health-check":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/x.git"}}}}`,
+		"odoopack.lock": `{"format_version":2,"content_hash":"sha256:00","packages":{"acme/health-check":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/x.git"}}}}`,
 		filepath.Join("addons", "odoopack", addonsdir.MarkerName):                   "",
 		filepath.Join("addons", "odoopack", "acme_health_check", "__manifest__.py"): "{}",
 	})
@@ -261,7 +261,7 @@ func TestInstallRejectsNewerLockfileFormat(t *testing.T) {
 const unreachableManifest = `{"name":"test","odoo":"19.0","require":{"acme/health-check":"19.0"},"indexes":{"default":{"url":"http://127.0.0.1:1","type":"registry"}},"addons_path":"addons/odoopack"}`
 
 // staleLockfile locks acme/health-check, but its content hash matches nothing.
-const staleLockfile = `{"format":1,"content_hash":"sha256:00","packages":{"acme/health-check":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/x.git"},"direct":true}}}`
+const staleLockfile = `{"format_version":1,"content_hash":"sha256:00","packages":{"acme/health-check":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/x.git"},"direct":true}}}`
 
 func TestInstallResolvesStaleLockfile(t *testing.T) {
 	if runInstallIfChild() {

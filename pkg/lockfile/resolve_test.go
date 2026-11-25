@@ -145,7 +145,7 @@ func TestLockfileWithoutIndexKeepsContentHash(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	path := useLock(t, `{"format":1,"content_hash":"`+hash+`","packages":{"acme/health-check":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/x.git"},"direct":true}}}`)
+	path := useLock(t, `{"format_version":1,"content_hash":"`+hash+`","packages":{"acme/health-check":{"version":"19.0.1.0.0","dist":{"type":"git","url":"https://example.com/x.git"},"direct":true}}}`)
 
 	old, err := Load()
 	if err != nil {
