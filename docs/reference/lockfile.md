@@ -17,7 +17,7 @@ The lockfile pins the exact distribution of every requirement so that installs a
         "reference": "<git-sha>",
         "shasum": "sha256:<hex>"
       },
-      "index": "company"
+      "registry": "https://registry.example.com"
     }
   }
 }
@@ -28,7 +28,7 @@ The lockfile pins the exact distribution of every requirement so that installs a
 | Field | Type | Description |
 | --- | --- | --- |
 | `format` | integer | Version of the lockfile format, currently `1`. A lockfile without it is format 1. odoopack refuses a lockfile with a higher format than it knows and asks you to upgrade odoopack; it always writes the current format. Not part of `content_hash`, so a lockfile does not become stale when it gains the field. |
-| `content_hash` | string | `sha256:` hash of the requirements, indexes, `odoo` series, and locked packages. Used to detect when the lockfile is stale relative to the manifest. |
+| `content_hash` | string | `sha256:` hash of the requirements, the URL and type of each index, the `odoo` series, and the locked packages. Used to detect when the lockfile is stale relative to the manifest. Index names are not part of it, so renaming an index does not make the lockfile stale. |
 | `packages` | object | Map of addon name to the locked package. |
 
 ### `packages.<name>`
@@ -43,7 +43,8 @@ The lockfile pins the exact distribution of every requirement so that installs a
 | `direct` | boolean | `true` when `odoopack.json` requires the package, `false` when it is only a dependency of another package. |
 | `depends` | array | Packages this package depends on. They are locked too. |
 | `external` | array | Modules this package depends on that no index provides, such as the modules that ship with Odoo. |
-| `index` | string | Name of the index the package was resolved from, or `default` for the built-in default registry. Later resolutions ask this index only, as long as the manifest still has an index with this name. Missing in lockfiles written by earlier releases; such a package is resolved as if it were new. |
+| `registry` | string | URL of the index the package was resolved from, the built-in default registry included, with scheme and host in lower case and no trailing slash. Later resolutions ask this index only, as long as the manifest has an index with this URL, whatever its name. Missing in lockfiles written by earlier releases; such a package is resolved as if it were new. |
+| `index` | string | Name of the index the package was resolved from, written by releases before `registry` existed. odoopack still reads it and replaces it with `registry` the next time it writes the package. Rename an index only after the lockfile has been written with `registry`, for example by `odoopack update`. |
 
 ## Resolution
 
@@ -62,8 +63,8 @@ conflicting requirements for acme/base-tools: the manifest requires 19.0.1.0.0 a
 
 Nothing is written when resolution fails. Dependencies carry only the series for now, and a requirement in `odoopack.json` must already match the series, so in practice this applies once dependencies can ask for a version.
 
-[`update <addon>`](../commands/update.md) and [`remove`](../commands/remove.md) keep a locked package as it is when its locked version still meets its requirements, comes from an index the manifest still has, and pins its content. [`install`](../commands/install.md) on a stale lockfile, [`require`](../commands/require.md), and `update` without an argument resolve every package again.
+[`update <addon>`](../commands/update.md) and [`remove`](../commands/remove.md) keep a locked package as it is when its locked version still meets its requirements, comes from an index the manifest still has (by URL), and pins its content. [`install`](../commands/install.md) on a stale lockfile, [`require`](../commands/require.md), and `update` without an argument resolve every package again.
 
 ## Staleness
 
-When you change `require`, `indexes` or `odoo` in the manifest, the lockfile's `content_hash` no longer matches. [`install`](../commands/install.md) detects this, re-resolves against the registry, and rewrites the lockfile before installing, or fails with `--frozen-lockfile`. [`update`](../commands/update.md) always re-resolves.
+When you change `require`, the URL or type of an index, or `odoo` in the manifest, the lockfile's `content_hash` no longer matches. [`install`](../commands/install.md) detects this, re-resolves against the registry, and rewrites the lockfile before installing, or fails with `--frozen-lockfile`. [`update`](../commands/update.md) always re-resolves.

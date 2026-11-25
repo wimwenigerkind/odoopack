@@ -13,10 +13,23 @@ type LockedPackage struct {
 	Direct   bool     `json:"direct"`
 	Depends  []string `json:"depends,omitempty"`
 	External []string `json:"external,omitempty"`
-	// Index names the index the package was resolved from, so that later
-	// resolutions ask that index only. Lockfiles written before the field
-	// existed lack it.
+	// Registry is the normalized URL of the index the package was resolved
+	// from, so that later resolutions ask that index only, whatever it is
+	// named in the manifest. Lockfiles written before the field existed lack
+	// it.
+	Registry string `json:"registry,omitempty"`
+	// Index is the name of that index, which lockfiles held before Registry.
+	// It is only read: resolving the package again writes Registry instead.
 	Index string `json:"index,omitempty"`
+}
+
+// LockedTo is what the package is locked to: the URL of its index or, in an
+// older lockfile, the name.
+func (p LockedPackage) LockedTo() string {
+	if p.Registry != "" {
+		return p.Registry
+	}
+	return p.Index
 }
 
 // Format is the lockfile format this odoopack writes. Raise it only when an

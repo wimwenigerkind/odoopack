@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -61,11 +62,11 @@ func TestRecomputeHashRecordsIndex(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := lf.Packages["acme/health-check"].Index; got != "a" {
-		t.Errorf("acme/health-check locked to index %q, want a", got)
+	if got := lf.Packages["acme/health-check"].Registry; got != first {
+		t.Errorf("acme/health-check locked to %q, want index a (%s)", got, first)
 	}
-	if got := lf.Packages["acme/base-tools"].Index; got != "b" {
-		t.Errorf("acme/base-tools locked to index %q, want b", got)
+	if got := lf.Packages["acme/base-tools"].Registry; got != second {
+		t.Errorf("acme/base-tools locked to %q, want index b (%s)", got, second)
 	}
 }
 
@@ -78,8 +79,8 @@ func TestRecomputeHashRecordsImplicitDefault(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := lf.Packages["acme/health-check"].Index; got != "default" {
-		t.Fatalf("locked to index %q, want default", got)
+	if got := lf.Packages["acme/health-check"].Registry; got != public {
+		t.Fatalf("locked to %q, want the default index %s", got, public)
 	}
 }
 
@@ -102,8 +103,8 @@ func TestRecomputeHashResolvesLockedFromItsIndex(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, pkg := range lf.Packages {
-		if pkg.Index != "b" {
-			t.Errorf("%s locked to index %q, want b", name, pkg.Index)
+		if pkg.Registry != second || pkg.Index != "" {
+			t.Errorf("%s locked to %q (index %q), want only the URL of b (%s)", name, pkg.Registry, pkg.Index, second)
 		}
 	}
 	if n := firstHits.Load(); n != 0 {
@@ -129,8 +130,8 @@ func TestRecomputeHashWithLockfileWithoutIndex(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := lf.Packages["acme/health-check"].Index; got != "b" {
-		t.Fatalf("locked to index %q, want b", got)
+	if got := lf.Packages["acme/health-check"].Registry; got != second {
+		t.Fatalf("locked to %q, want index b (%s)", got, second)
 	}
 }
 
@@ -215,7 +216,7 @@ func TestUpdateResolvesTreeAndKeepsOthers(t *testing.T) {
 		t.Fatal(err)
 	}
 	hc := lf.Packages["acme/health-check"]
-	if hc.Version != "19.0.2.0.0" || !hc.Direct || hc.Index != "a" || strings.Join(hc.Depends, ",") != "acme/base-tools,acme/shared" {
+	if hc.Version != "19.0.2.0.0" || !hc.Direct || hc.Registry != indexes["a"].Url || strings.Join(hc.Depends, ",") != "acme/base-tools,acme/shared" {
 		t.Errorf("acme/health-check locked as %+v", hc)
 	}
 	if bt, ok := lf.Packages["acme/base-tools"]; !ok || bt.Direct {
@@ -356,14 +357,15 @@ func TestRelockKeepsPackageFromImplicitDefault(t *testing.T) {
 	viper.Set("default_index_url", public)
 
 	fromDefault := locked("19.0.1.0.0", true)
-	fromDefault.Index = "default"
+	fromDefault.Index = ""
+	fromDefault.Registry = public
 	old := map[string]LockedPackage{"acme/public-tools": fromDefault}
 
 	lf, err := Relock(map[string]string{"acme/public-tools": "19.0"}, indexes, "19.0", old)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := lf.Packages["acme/public-tools"]; got.Index != "default" || got.Version != "19.0.1.0.0" {
+	if got := lf.Packages["acme/public-tools"]; got.Registry != public || got.Version != "19.0.1.0.0" {
 		t.Errorf("locked %+v, want the package kept from the default index", got)
 	}
 	if n := hits.Load() + publicHits.Load(); n != 0 {
@@ -380,5 +382,76 @@ func TestRelockRefusesModuleCollision(t *testing.T) {
 	_, err := Relock(map[string]string{"acme/health-check": "19.0", "acme/health_check": "19.0"}, indexes, "19.0", old)
 	if err == nil || !strings.Contains(err.Error(), "acme_health_check") {
 		t.Fatalf("got error %v, want one naming the shared addon directory", err)
+	}
+}
+
+func TestRenamedIndexKeepsLockfile(t *testing.T) {
+	served := registryapi.Addon{Name: "acme/health-check", Versions: []registryapi.Version{release("19.0.1.0.0")}}
+	indexes, hits := singleIndex(t, served)
+	require := map[string]string{"acme/health-check": "19.0"}
+
+	lf, err := RecomputeHash(require, indexes, "19.0", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	renamed := manifest.Indexes{"company": {Url: indexes["a"].Url + "/", Type: "registry"}}
+	if stale, err := IsStale(require, renamed, "19.0", lf.Packages, lf.ContentHash); err != nil || stale {
+		t.Fatalf("renaming the index made the lockfile stale (%v, %v)", stale, err)
+	}
+
+	hits.Store(0)
+	again, err := Relock(require, renamed, "19.0", lf.Packages)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(again, lf) {
+		t.Errorf("relocking after the rename changed the lockfile:\n%+v\nwant\n%+v", again, lf)
+	}
+	if n := hits.Load(); n != 0 {
+		t.Errorf("relocking after the rename sent %d request(s)", n)
+	}
+}
+
+func TestLockfileWithIndexNameIsWrittenBackWithRegistry(t *testing.T) {
+	indexes, hits := singleIndex(t)
+	require := map[string]string{"acme/health-check": "19.0"}
+	old := map[string]LockedPackage{"acme/health-check": locked("19.0.1.0.0", true)}
+
+	hash, err := namedHash(require, indexes, "19.0", old)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stale, err := IsStale(require, indexes, "19.0", old, hash); err != nil || stale {
+		t.Fatalf("a lockfile hashed with index names is stale (%v, %v)", stale, err)
+	}
+
+	lf, err := Relock(require, indexes, "19.0", old)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := lf.Packages["acme/health-check"]; got.Registry != indexes["a"].Url || got.Index != "" || got.Version != "19.0.1.0.0" {
+		t.Errorf("locked %+v, want the package kept with the URL of index a (%s)", got, indexes["a"].Url)
+	}
+	if n := hits.Load(); n != 0 {
+		t.Errorf("rewriting the index name sent %d request(s)", n)
+	}
+}
+
+func TestChangedRegistryURLResolvesAgain(t *testing.T) {
+	served := registryapi.Addon{Name: "acme/health-check", Versions: []registryapi.Version{release("19.0.1.0.0")}}
+	indexes, hits := singleIndex(t, served)
+	moved := locked("19.0.1.0.0", true)
+	moved.Index = ""
+	moved.Registry = "https://old.example.com"
+
+	lf, err := Relock(map[string]string{"acme/health-check": "19.0"}, indexes, "19.0", map[string]LockedPackage{"acme/health-check": moved})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := lf.Packages["acme/health-check"].Registry; got != indexes["a"].Url {
+		t.Errorf("locked to %q, want index a (%s)", got, indexes["a"].Url)
+	}
+	if hits.Load() == 0 {
+		t.Error("a package locked to a registry no index points at was kept without asking index a")
 	}
 }

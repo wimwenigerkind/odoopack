@@ -77,13 +77,13 @@ func TestLookupFallsThroughOnlyOnNotFound(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if got.Index != "b" {
-					t.Fatalf("resolved from index %q, want b", got.Index)
+				if got.Registry != second {
+					t.Fatalf("resolved from %q, want index b (%s)", got.Registry, second)
 				}
 				return
 			}
 			if err == nil {
-				t.Fatalf("resolved from index %q, want an error", got.Index)
+				t.Fatalf("resolved from %q, want an error", got.Registry)
 			}
 			if !strings.Contains(err.Error(), tc.wantErr) || !strings.Contains(err.Error(), "index a ("+first+")") {
 				t.Fatalf("got error %v, want one naming index a and containing %q", err, tc.wantErr)
@@ -125,8 +125,8 @@ func TestLookupTriesImplicitDefaultLast(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Index != DefaultIndexName {
-		t.Fatalf("resolved from index %q, want %s", got.Index, DefaultIndexName)
+	if got.Registry != public {
+		t.Fatalf("resolved from %q, want the default index %s", got.Registry, public)
 	}
 	if configuredHits.Load() != 1 || publicHits.Load() != 1 {
 		t.Fatalf("got %d request(s) to the configured and %d to the default index, want one each", configuredHits.Load(), publicHits.Load())
@@ -175,8 +175,8 @@ func TestLookupUsesImplicitDefaultWithoutIndexes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Index != DefaultIndexName {
-		t.Fatalf("resolved from index %q, want %s", got.Index, DefaultIndexName)
+	if got.Registry != public {
+		t.Fatalf("resolved from %q, want the default index %s", got.Registry, public)
 	}
 }
 
@@ -189,12 +189,45 @@ func TestLookupLockedAsksOnlyItsIndex(t *testing.T) {
 		"b": {Url: second, Type: "registry"},
 	}
 
-	got, err := LookupLocked(indexes, "b", "acme/health-check", "19.0", "19.0")
+	for _, locked := range []string{second, "b"} {
+		got, err := LookupLocked(indexes, locked, "acme/health-check", "19.0", "19.0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Registry != second || firstHits.Load() != 0 {
+			t.Fatalf("locked to %q: resolved from %q with %d request(s) to a, want b only", locked, got.Registry, firstHits.Load())
+		}
+	}
+}
+
+func TestLookupLockedFindsRenamedIndexByURL(t *testing.T) {
+	first, firstHits := registry(t, serving)
+	second, _ := registry(t, serving)
+	useDefault(t, "")
+	indexes := manifest.Indexes{
+		"a":       {Url: first, Type: "registry"},
+		"renamed": {Url: second + "/", Type: "registry"},
+	}
+
+	got, err := LookupLocked(indexes, second, "acme/health-check", "19.0", "19.0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Index != "b" || firstHits.Load() != 0 {
-		t.Fatalf("resolved from index %q with %d request(s) to a, want b only", got.Index, firstHits.Load())
+	if got.Registry != second || firstHits.Load() != 0 {
+		t.Fatalf("resolved from %q with %d request(s) to a, want the renamed index only", got.Registry, firstHits.Load())
+	}
+}
+
+func TestNormalizeURL(t *testing.T) {
+	for raw, want := range map[string]string{
+		"https://Registry.Example.com/":      "https://registry.example.com",
+		"HTTPS://registry.example.com/odoo/": "https://registry.example.com/odoo",
+		"https://registry.example.com":       "https://registry.example.com",
+		"http://localhost:8080//":            "http://localhost:8080",
+	} {
+		if got := NormalizeURL(raw); got != want {
+			t.Errorf("NormalizeURL(%q) = %q, want %q", raw, got, want)
+		}
 	}
 }
 
@@ -221,7 +254,7 @@ func TestLookupLockedToRemovedIndexResolvesAgain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Index != "a" {
-		t.Fatalf("resolved from index %q, want a", got.Index)
+	if got.Registry != first {
+		t.Fatalf("resolved from %q, want index a (%s)", got.Registry, first)
 	}
 }
