@@ -59,7 +59,7 @@ func project(t *testing.T, m *manifest.Manifest, packages map[string]lockfile.Lo
 	if err := manifest.Save(*m); err != nil {
 		t.Fatal(err)
 	}
-	hash, err := lockfile.ComputeHash(m.Require, m.Indexes, m.OdooSeries, packages)
+	hash, err := lockfile.ComputeHash(m.Require, m.Indexes, m.OdooSeries)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -114,7 +114,7 @@ func TestFormatKeepsContentHash(t *testing.T) {
 	packages := map[string]LockedPackage{
 		"acme/health-check": {Version: "19.0.1.0.0", Dist: Dist{Type: "git", URL: "https://example.com/x.git"}, Direct: true},
 	}
-	hash, err := ComputeHash(require, indexes, "19.0", packages)
+	hash, err := packagesHash(require, indexes, "19.0", packages)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +132,7 @@ func TestFormatKeepsContentHash(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := ComputeHash(require, indexes, "19.0", saved.Packages)
+	got, err := packagesHash(require, indexes, "19.0", saved.Packages)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,7 +169,7 @@ func TestLoadReadsLegacyKeysAndKeepsContentHash(t *testing.T) {
 	if stale {
 		t.Fatal("a lockfile with the legacy keys is stale")
 	}
-	if got, err := ComputeHash(require, indexes, "19.0", lf.Packages); err != nil || got != legacyContentHash {
+	if got, err := packagesHash(require, indexes, "19.0", lf.Packages); err != nil || got != legacyContentHash {
 		t.Fatalf("got hash %s (%v), want %s", got, err, legacyContentHash)
 	}
 
@@ -196,19 +196,20 @@ func TestUnknownIndexKeysKeepContentHash(t *testing.T) {
 	require := map[string]string{"acme/health-check": "19.0"}
 	plain := manifest.Indexes{{Name: "company", Url: "https://registry.example.com", Type: "registry"}}
 	extended := manifest.Indexes{{Name: "company", Url: "https://registry.example.com", Type: "registry", Unknown: map[string]jsontext.Value{"priority": jsontext.Value(`10`)}}}
+	packages := map[string]LockedPackage{"acme/health-check": {Version: "19.0.1.0.0"}}
 
-	hash, err := ComputeHash(require, plain, "19.0", nil)
+	hash, err := ComputeHash(require, plain, "19.0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stale, err := IsStale(require, extended, "19.0", nil, hash); err != nil || stale {
+	if stale, err := IsStale(require, extended, "19.0", packages, hash); err != nil || stale {
 		t.Fatalf("lockfile is stale (%v) once an index gains an unknown key", err)
 	}
-	named, err := namedHash(require, plain, "19.0", nil)
+	named, err := namedHash(require, plain, "19.0", packages)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stale, err := IsStale(require, extended, "19.0", nil, named); err != nil || stale {
+	if stale, err := IsStale(require, extended, "19.0", packages, named); err != nil || stale {
 		t.Fatalf("lockfile hashed by index name is stale (%v) once an index gains an unknown key", err)
 	}
 }
@@ -260,7 +261,7 @@ func TestChangedSeriesMakesLockfileStale(t *testing.T) {
 	}
 
 	for _, from := range []string{"19.0", ""} {
-		hash, err := ComputeHash(require, nil, from, packages)
+		hash, err := ComputeHash(require, nil, from)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -394,5 +395,45 @@ func TestLoadRejectsDuplicateKeys(t *testing.T) {
 
 	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "duplicate") {
 		t.Fatalf("got error %v, want one about the duplicate key", err)
+	}
+}
+
+// TestComputeHashIsCanonical pins content_hash to its definition: the
+// RFC 8785 form of odoo_series, require and the indexes by URL, which a tool
+// other than odoopack computes the same way.
+func TestComputeHashIsCanonical(t *testing.T) {
+	require := map[string]string{"acme/health-check": "19.0", "acme/base-tools": "19.0.1.0.0"}
+	indexes := manifest.Indexes{
+		{Name: "public", Url: "https://ODOOPACK.example.com/", Type: "registry"},
+		{Name: "company", Url: "https://registry.example.com", Type: "registry"},
+	}
+	canonical := `{"indexes":[{"type":"registry","url":"https://odoopack.example.com"},{"type":"registry","url":"https://registry.example.com"}],"odoo_series":"19.0","require":{"acme/base-tools":"19.0.1.0.0","acme/health-check":"19.0"}}`
+
+	got, err := ComputeHash(require, indexes, "19.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := fmt.Sprintf("sha256:%x", sha256.Sum256([]byte(canonical))); got != want {
+		t.Fatalf("got %s, want %s, the sha256 of %s", got, want, canonical)
+	}
+
+	renamed := manifest.Indexes{
+		{Name: "company-2", Url: "https://registry.example.com", Type: "registry"},
+		{Name: "public", Url: "https://odoopack.example.com", Type: "registry"},
+	}
+	if again, err := ComputeHash(require, renamed, "19.0"); err != nil || again != got {
+		t.Fatalf("renaming and reordering the indexes changed the hash to %s (%v)", again, err)
+	}
+}
+
+func TestMissingRequiredPackageIsStale(t *testing.T) {
+	require := map[string]string{"acme/health-check": "19.0", "acme/base-tools": "19.0"}
+	hash, err := ComputeHash(require, nil, "19.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	packages := map[string]LockedPackage{"acme/health-check": {Version: "19.0.1.0.0"}}
+	if stale, err := IsStale(require, nil, "19.0", packages, hash); err != nil || !stale {
+		t.Fatalf("lockfile without a required package is not stale (%v)", err)
 	}
 }
