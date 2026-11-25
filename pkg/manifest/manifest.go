@@ -1,7 +1,8 @@
 package manifest
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"os"
 
@@ -53,7 +54,7 @@ func Save(manifest Manifest) error {
 	if err := manifest.Validate(); err != nil {
 		return fmt.Errorf("refusing to write %s: %w", viper.GetString("manifest"), err)
 	}
-	data, err := json.MarshalIndent(manifest, "", "  ")
+	data, err := json.Marshal(manifest, jsontext.WithIndent("  "), json.Deterministic(true))
 	if err != nil {
 		return err
 	}

@@ -1,7 +1,7 @@
 package manifest
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 	"os"
 	"strings"
 	"testing"
@@ -53,7 +53,7 @@ func TestLoadRejectsInvalidIndexNames(t *testing.T) {
 		`[{"name":"a","url":"https://a.example.com","type":"registry"},{"name":"a","url":"https://b.example.com","type":"registry"}]`,
 	} {
 		useManifest(t, `{"name":"test","odoo_series":"19.0","indexes":`+indexes+`,"addons_dir":"addons/odoopack"}`)
-		if _, err := Load(); err == nil || !strings.Contains(err.Error(), "indexes:") {
+		if _, err := Load(); err == nil || !strings.Contains(err.Error(), "index name") {
 			t.Errorf("indexes %s: got error %v, want one about the index names", indexes, err)
 		}
 	}
