@@ -40,7 +40,7 @@ The lockfile pins the exact distribution of every requirement so that installs a
 | `version` | string | The resolved version. |
 | `module` | string | Directory the package installs to inside `addons_dir`, the technical name of its Odoo module: lowercase letters, digits and `_`. odoopack sets it when it locks the package, currently by replacing `/` and `-` in the package name with `_`, and from then on takes it from here: install, update and remove never derive it again. Two packages with the same module are refused. |
 | `dist.type` | string | Distribution type: `zip` or `git`. |
-| `dist.url` | string | Download URL (zip) or clone URL (git). |
+| `dist.url` | string | Download URL (zip) or clone URL (git), absolute and exactly as the registry returned it. It may point at another host than `index_url`, such as a CDN or a git host. A token from `ODOOPACK_AUTH` is chosen by the host of this URL, so another host only gets one when `ODOOPACK_AUTH` has a token for it, and a token is only sent over `https` (plain `http` is allowed for localhost). A git URL must use `https` or `ssh`. The content is checked against `dist.digest` or `dist.reference`, wherever it comes from. |
 | `dist.reference` | string | Git reference (commit SHA) the distribution was built from. |
 | `dist.digest` | string | `sha256:` digest of the zip. Verified on install; a mismatch aborts the install. |
 | `direct` | boolean | `true` when `odoopack.json` requires the package, `false` when it is only a dependency of another package. |
