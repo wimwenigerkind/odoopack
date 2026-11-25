@@ -46,6 +46,10 @@ The lockfile pins the exact distribution of every requirement so that installs a
 | `index_url` | string | URL of the index the package was resolved from, the built-in default registry included, with scheme and host in lower case and no trailing slash. Later resolutions ask this index only, as long as the manifest has an index with this URL, whatever its name. Missing in lockfiles written by earlier releases; such a package is resolved as if it were new. |
 | `index` | string | Name of the index the package was resolved from, written by releases before `index_url` existed. odoopack still reads it and replaces it with `index_url` the next time it writes the package. Rename an index only after the lockfile has been written with `index_url`, for example by `odoopack update`. |
 
+## Unknown keys
+
+odoopack writes the lockfile from scratch and does not keep keys it does not know. A newer odoopack that adds an optional key writes it again on its next write. Keys of an index in the manifest that odoopack does not know are not part of `content_hash`.
+
 ## Renamed keys
 
 Releases before format version 1 was frozen wrote `format` instead of `format_version`, `dist.shasum` instead of `dist.digest`, `external` instead of `external_modules` and `registry` instead of `index_url`. odoopack still reads them and writes the new keys the next time it writes the lockfile. The renaming does not change `content_hash`, so such a lockfile is not stale and `install --frozen-lockfile` keeps working.

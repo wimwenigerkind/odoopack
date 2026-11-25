@@ -191,6 +191,27 @@ func TestLoadReadsLegacyKeysAndKeepsContentHash(t *testing.T) {
 	}
 }
 
+func TestUnknownIndexKeysKeepContentHash(t *testing.T) {
+	require := map[string]string{"acme/health-check": "19.0"}
+	plain := manifest.Indexes{"company": {Url: "https://registry.example.com", Type: "registry"}}
+	extended := manifest.Indexes{"company": {Url: "https://registry.example.com", Type: "registry", Unknown: map[string]json.RawMessage{"priority": json.RawMessage(`10`)}}}
+
+	hash, err := ComputeHash(require, plain, "19.0", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stale, err := IsStale(require, extended, "19.0", nil, hash); err != nil || stale {
+		t.Fatalf("lockfile is stale (%v) once an index gains an unknown key", err)
+	}
+	named, err := namedHash(require, plain, "19.0", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stale, err := IsStale(require, extended, "19.0", nil, named); err != nil || stale {
+		t.Fatalf("lockfile hashed by index name is stale (%v) once an index gains an unknown key", err)
+	}
+}
+
 func TestLockPackageRequiresIntegrity(t *testing.T) {
 	const shasum = "sha256:ece96e65881389c3ef6538ea26b9d7149e8e0af042c828d17283c6b76c633543"
 	const commit = "6b6c390a387c81ee604b602e49ca6c35646cc619"

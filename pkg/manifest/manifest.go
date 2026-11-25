@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/wimwenigerkind/odoopack-spec/name"
 	"github.com/wimwenigerkind/odoopack/pkg/helper"
+	"github.com/wimwenigerkind/odoopack/pkg/ui"
 )
 
 func Load() (*Manifest, error) {
@@ -31,6 +32,12 @@ func Load() (*Manifest, error) {
 	manifest.FormatVersion, err = helper.CheckFormatVersion(viper.GetString("manifest"), manifest.FormatVersion, FormatVersion)
 	if err != nil {
 		return nil, err
+	}
+	// Save keeps these keys, so a key a newer odoopack added survives a
+	// write by this one. The warning catches a misspelt key, which would
+	// otherwise be ignored silently.
+	for _, key := range manifest.UnknownKeys() {
+		ui.Warn("%s: unknown key %q is kept but ignored by this odoopack", viper.GetString("manifest"), key)
 	}
 	for pkg := range manifest.Require {
 		if err := name.ValidPackage(pkg); err != nil {
