@@ -37,7 +37,7 @@ var listCmd = &cobra.Command{
 
 		var rows [][]string
 		for _, name := range names {
-			rows = append(rows, []string{name, m.Require[name], installedStatus(m.AddonsPath, name)})
+			rows = append(rows, []string{name, m.Require[name], installedStatus(m.AddonsDir, name)})
 		}
 
 		ui.Println(ui.Table([]string{"Name", "Version", "Installed"}, rows))

@@ -1,4 +1,4 @@
-// Package addonsdir guards the addons_path directory, which install clears and
+// Package addonsdir guards the addons_dir directory, which install clears and
 // rebuilds, so that odoopack only ever deletes what it created itself.
 package addonsdir
 
@@ -15,18 +15,18 @@ const (
 	markerContent = "This directory is managed by odoopack: install deletes and rebuilds it.\n"
 )
 
-// Check reports whether path is usable as addons_path for the project in
+// Check reports whether path is usable as addons_dir for the project in
 // projectDir: relative, and resolving to a directory strictly inside the
 // project, also after following symlinks of the parts that already exist.
 func Check(projectDir, path string) error {
 	if path == "" {
-		return errors.New("addons_path is not set")
+		return errors.New("addons_dir is not set")
 	}
 	if !filepath.IsLocal(path) {
-		return fmt.Errorf("addons_path %q must be a relative path inside the project", path)
+		return fmt.Errorf("addons_dir %q must be a relative path inside the project", path)
 	}
 	if filepath.Clean(path) == "." {
-		return fmt.Errorf("addons_path %q must not be the project directory itself", path)
+		return fmt.Errorf("addons_dir %q must not be the project directory itself", path)
 	}
 
 	root, err := filepath.EvalSymlinks(projectDir)
@@ -35,11 +35,11 @@ func Check(projectDir, path string) error {
 	}
 	resolved, err := resolve(filepath.Join(root, path))
 	if err != nil {
-		return fmt.Errorf("addons_path %q: %w", path, err)
+		return fmt.Errorf("addons_dir %q: %w", path, err)
 	}
 	rel, err := filepath.Rel(root, resolved)
 	if err != nil || rel == "." || !filepath.IsLocal(rel) {
-		return fmt.Errorf("addons_path %q resolves to %s, which is not inside the project", path, resolved)
+		return fmt.Errorf("addons_dir %q resolves to %s, which is not inside the project", path, resolved)
 	}
 	return nil
 }
@@ -97,7 +97,7 @@ func Clear(dir string, locked map[string]bool) error {
 // RemoveAddon deletes the directory addonDir inside dir.
 func RemoveAddon(dir, addonDir string, locked map[string]bool) error {
 	if !filepath.IsLocal(addonDir) || filepath.Base(addonDir) != addonDir || addonDir == "." {
-		return fmt.Errorf("addon directory %q is not a single name inside addons_path", addonDir)
+		return fmt.Errorf("addon directory %q is not a single name inside addons_dir", addonDir)
 	}
 	if err := checkOwned(dir, locked); err != nil {
 		return err
@@ -124,7 +124,7 @@ func checkOwned(dir string, locked map[string]bool) error {
 		// ReadDir does not follow symlinks, so a link named like a locked
 		// addon is not a directory here and is refused.
 		if !e.IsDir() || !locked[e.Name()] {
-			return fmt.Errorf("addons_path %s is not empty and was not created by odoopack (no %s file, and %s is not an installed addon); empty it or choose another addons_path", dir, MarkerName, e.Name())
+			return fmt.Errorf("addons_dir %s is not empty and was not created by odoopack (no %s file, and %s is not an installed addon); empty it or choose another addons_dir", dir, MarkerName, e.Name())
 		}
 	}
 	return writeMarker(dir)

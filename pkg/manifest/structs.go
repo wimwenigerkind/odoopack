@@ -1,5 +1,7 @@
 package manifest
 
+import "encoding/json"
+
 type Requirements map[string]string
 
 type Index struct {
@@ -19,19 +21,42 @@ type Manifest struct {
 	// become stale when its manifest gains the field.
 	FormatVersion int          `json:"format_version"`
 	Name          string       `json:"name"`
-	Odoo          string       `json:"odoo"`
+	OdooSeries    string       `json:"odoo_series"`
 	Require       Requirements `json:"require"`
 	Indexes       Indexes      `json:"indexes"`
-	AddonsPath    string       `json:"addons_path"`
+	AddonsDir     string       `json:"addons_dir"`
 }
 
-func NewManifest(name, addonsPath, odoo string) *Manifest {
+// UnmarshalJSON also reads odoo and addons_path, which releases before
+// odoo_series and addons_dir wrote. Save writes the new keys only, so the old
+// ones go away with the next write.
+func (m *Manifest) UnmarshalJSON(data []byte) error {
+	type plain Manifest
+	var v struct {
+		plain
+		Odoo       string `json:"odoo"`
+		AddonsPath string `json:"addons_path"`
+	}
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	*m = Manifest(v.plain)
+	if m.OdooSeries == "" {
+		m.OdooSeries = v.Odoo
+	}
+	if m.AddonsDir == "" {
+		m.AddonsDir = v.AddonsPath
+	}
+	return nil
+}
+
+func NewManifest(name, addonsDir, odooSeries string) *Manifest {
 	return &Manifest{
 		FormatVersion: FormatVersion,
 		Name:          name,
-		Odoo:          odoo,
+		OdooSeries:    odooSeries,
 		Require:       make(Requirements),
 		Indexes:       Indexes{},
-		AddonsPath:    addonsPath,
+		AddonsDir:     addonsDir,
 	}
 }

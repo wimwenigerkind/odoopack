@@ -6,10 +6,10 @@ import (
 )
 
 func TestPlan(t *testing.T) {
-	v1 := LockedPackage{Version: "19.0.1.0.0", Dist: Dist{Type: "zip", URL: "https://example.com/1.zip", Shasum: "sha256:01"}}
-	v2 := LockedPackage{Version: "19.0.2.0.0", Dist: Dist{Type: "zip", URL: "https://example.com/2.zip", Shasum: "sha256:02"}}
+	v1 := LockedPackage{Version: "19.0.1.0.0", Dist: Dist{Type: "zip", URL: "https://example.com/1.zip", Digest: "sha256:01"}}
+	v2 := LockedPackage{Version: "19.0.2.0.0", Dist: Dist{Type: "zip", URL: "https://example.com/2.zip", Digest: "sha256:02"}}
 	moved := v1
-	moved.Dist.Shasum = "sha256:03"
+	moved.Dist.Digest = "sha256:03"
 	reindexed := v1
 	reindexed.Index = "company"
 	reindexed.Direct = true

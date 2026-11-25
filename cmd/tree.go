@@ -74,7 +74,7 @@ func buildDepNode(name string, pkgs map[string]lockfile.LockedPackage, expanded 
 		node.Child(buildDepNode(d, pkgs, expanded))
 	}
 
-	ext := append([]string(nil), pkg.External...)
+	ext := append([]string(nil), pkg.ExternalModules...)
 	sort.Strings(ext)
 	for _, e := range ext {
 		node.Child(ui.Muted(e + " (external)"))

@@ -35,7 +35,7 @@ func (i *ZipInstaller) Install(targetDir string, addonName string, pkg lockfile.
 	if err := checkIntegrity(addonName, pkg); err != nil {
 		return err
 	}
-	want, err := digest.Parse(pkg.Dist.Shasum)
+	want, err := digest.Parse(pkg.Dist.Digest)
 	if err != nil {
 		return err
 	}

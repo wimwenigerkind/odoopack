@@ -8,6 +8,7 @@ The manifest describes your project: which addons it requires and which registri
 {
   "format_version": 1,
   "name": "my-project",
+  "odoo_series": "19.0",
   "require": {
     "acme/health-check": "19.0.1.0.0"
   },
@@ -17,7 +18,7 @@ The manifest describes your project: which addons it requires and which registri
       "type": "registry"
     }
   },
-  "addons_path": "addons/odoopack"
+  "addons_dir": "addons/odoopack"
 }
 ```
 
@@ -27,9 +28,10 @@ The manifest describes your project: which addons it requires and which registri
 | --- | --- | --- |
 | `format_version` | integer | Version of the manifest format, currently `1`. A manifest without it is version 1. odoopack refuses a manifest with a higher version than it knows and asks you to upgrade odoopack; it always writes the current version. Adding an optional field does not raise it. Not part of the lockfile's `content_hash`. |
 | `name` | string | Project name. |
+| `odoo_series` | string | Odoo series the project targets, such as `19.0`. Written by [`init`](../commands/init.md) from `--odoo`. Every requirement and dependency is resolved for this series. |
 | `require` | object | Map of addon name to pinned version. The version is an exact string, not a range. |
 | `indexes` | object | Map of index name to `{ url, type }`. Registries to resolve addons from. |
-| `addons_path` | string | Directory addons are installed into. Defaults to `addons/odoopack`. Must be a relative path that resolves, also through symlinks, to a directory strictly inside the project, not the project directory itself. odoopack owns this directory: it writes a `.odoopack` marker into it and refuses to clear a non-empty directory without the marker. See [install](../commands/install.md#the-odoopack-marker). |
+| `addons_dir` | string | Directory addons are installed into. Defaults to `addons/odoopack`. Must be a relative path that resolves, also through symlinks, to a directory strictly inside the project, not the project directory itself. odoopack owns this directory: it writes a `.odoopack` marker into it and refuses to clear a non-empty directory without the marker. See [install](../commands/install.md#the-odoopack-marker). |
 
 ### `indexes.<name>`
 
@@ -39,3 +41,7 @@ The manifest describes your project: which addons it requires and which registri
 | `type` | string | Index type. `registry` is currently the only supported type. |
 
 Indexes are tried in alphabetical order by name during resolution, and only an index that does not have the addon passes it on to the next one. The built-in default registry is tried last. See [index](../commands/index-command.md#resolution-order).
+
+## Renamed keys
+
+Releases before format version 1 was frozen wrote `odoo` instead of `odoo_series` and `addons_path` instead of `addons_dir`. odoopack still reads both and writes the new keys the next time it writes the manifest.

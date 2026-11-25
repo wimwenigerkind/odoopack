@@ -140,6 +140,57 @@ func TestFormatKeepsContentHash(t *testing.T) {
 	}
 }
 
+// legacyLock is a lockfile with the keys releases before the renaming wrote,
+// and legacyHash its content_hash as those releases computed it.
+const (
+	legacyLock        = `{"format":1,"content_hash":"sha256:522cfae8eb38a569f835d291f2e53ae801859e481a6b87f5f4c809d2124043bf","packages":{"acme/health-check":{"version":"19.0.1.0.0","dist":{"type":"zip","url":"https://registry.example.com/z","reference":"6b6c390a387c81ee604b602e49ca6c35646cc619","shasum":"sha256:ece96e65881389c3ef6538ea26b9d7149e8e0af042c828d17283c6b76c633543"},"direct":true,"depends":["acme/base-tools"],"external":["base"],"registry":"https://registry.example.com"}}}`
+	legacyContentHash = "sha256:522cfae8eb38a569f835d291f2e53ae801859e481a6b87f5f4c809d2124043bf"
+)
+
+func TestLoadReadsLegacyKeysAndKeepsContentHash(t *testing.T) {
+	path := useLock(t, legacyLock)
+
+	lf, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	pkg := lf.Packages["acme/health-check"]
+	if pkg.Dist.Digest == "" || pkg.IndexURL != "https://registry.example.com" || strings.Join(pkg.ExternalModules, ",") != "base" {
+		t.Fatalf("legacy keys not read: %+v", pkg)
+	}
+
+	require := map[string]string{"acme/health-check": "19.0"}
+	indexes := manifest.Indexes{"company": {Url: "https://registry.example.com", Type: "registry"}}
+	stale, err := IsStale(require, indexes, "19.0", lf.Packages, lf.ContentHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stale {
+		t.Fatal("a lockfile with the legacy keys is stale")
+	}
+	if got, err := ComputeHash(require, indexes, "19.0", lf.Packages); err != nil || got != legacyContentHash {
+		t.Fatalf("got hash %s (%v), want %s", got, err, legacyContentHash)
+	}
+
+	if err := Save(lf); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{`"format":`, `"shasum":`, `"external":`, `"registry":`} {
+		if bytes.Contains(data, []byte(key)) {
+			t.Errorf("lockfile still has the legacy key %s:\n%s", key, data)
+		}
+	}
+	for _, key := range []string{`"format_version":`, `"digest":`, `"external_modules":`, `"index_url":`} {
+		if !bytes.Contains(data, []byte(key)) {
+			t.Errorf("lockfile lacks %s:\n%s", key, data)
+		}
+	}
+}
+
 func TestLockPackageRequiresIntegrity(t *testing.T) {
 	const shasum = "sha256:ece96e65881389c3ef6538ea26b9d7149e8e0af042c828d17283c6b76c633543"
 	const commit = "6b6c390a387c81ee604b602e49ca6c35646cc619"
@@ -149,7 +200,7 @@ func TestLockPackageRequiresIntegrity(t *testing.T) {
 		wantErr string
 	}{
 		{"zip with shasum", index.AddonVersion{Type: "zip", Shasum: shasum}, ""},
-		{"zip without shasum", index.AddonVersion{Type: "zip"}, "zip has no shasum"},
+		{"zip without digest", index.AddonVersion{Type: "zip"}, "zip has no digest"},
 		{"zip with md5", index.AddonVersion{Type: "zip", Shasum: "md5:00"}, "unsupported algorithm"},
 		{"git with commit", index.AddonVersion{Type: "git", Reference: commit}, ""},
 		{"git with sha256 commit", index.AddonVersion{Type: "git", Reference: strings.Repeat("a", 64)}, ""},
@@ -168,7 +219,7 @@ func TestLockPackageRequiresIntegrity(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if pkg.Dist.Type != tt.lookup.Type || pkg.Dist.Shasum != tt.lookup.Shasum || pkg.Dist.Reference != tt.lookup.Reference {
+				if pkg.Dist.Type != tt.lookup.Type || pkg.Dist.Digest != tt.lookup.Shasum || pkg.Dist.Reference != tt.lookup.Reference {
 					t.Fatalf("locked %+v from %+v", pkg.Dist, tt.lookup)
 				}
 				return

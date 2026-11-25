@@ -46,7 +46,7 @@ var removeCmd = &cobra.Command{
 		}
 		remaining := maps.Clone(m.Require)
 		delete(remaining, addonName)
-		next, err := lockfile.Relock(remaining, m.Indexes, m.Odoo, lock.Packages)
+		next, err := lockfile.Relock(remaining, m.Indexes, m.OdooSeries, lock.Packages)
 		if err != nil {
 			fatal(err)
 		}
@@ -54,7 +54,7 @@ var removeCmd = &cobra.Command{
 			fatal(fmt.Errorf("cannot remove %s: %s depend(s) on it", addonName, strings.Join(lockfile.Dependents(next.Packages, addonName), ", ")))
 		}
 
-		if err := addonsdir.Claim(m.AddonsPath, lockedDirs(lock.Packages, next.Packages)); err != nil {
+		if err := addonsdir.Claim(m.AddonsDir, lockedDirs(lock.Packages, next.Packages)); err != nil {
 			fatal(err)
 		}
 		m.RemoveRequirement(addonName)

@@ -13,9 +13,9 @@ import (
 	"github.com/wimwenigerkind/odoopack/pkg/ui"
 )
 
-// applyLock changes addons_path from the packages of prev to those of next,
+// applyLock changes addons_dir from the packages of prev to those of next,
 // touching only what differs. It returns how many packages it installed and
-// removed. The caller claims addons_path before it saves the manifest or the
+// removed. The caller claims addons_dir before it saves the manifest or the
 // lockfile, so that nothing is saved for a directory odoopack does not own.
 func applyLock(m *manifest.Manifest, prev, next lockfile.LockFile) (installed, removed int, err error) {
 	install, remove := lockfile.Plan(prev.Packages, next.Packages)
@@ -24,7 +24,7 @@ func applyLock(m *manifest.Manifest, prev, next lockfile.LockFile) (installed, r
 	// Removing first frees the directory of a dropped package for a new one
 	// with the same module name.
 	for _, pkg := range remove {
-		if err := addonsdir.RemoveAddon(m.AddonsPath, name.ModuleName(pkg), owned); err != nil {
+		if err := addonsdir.RemoveAddon(m.AddonsDir, name.ModuleName(pkg), owned); err != nil {
 			return 0, 0, err
 		}
 	}

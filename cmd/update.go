@@ -42,7 +42,7 @@ func updateAll(m *manifest.Manifest) {
 	if err != nil {
 		fatal(err)
 	}
-	lock, err := lockfile.RecomputeHash(m.Require, m.Indexes, m.Odoo, previous.Packages)
+	lock, err := lockfile.RecomputeHash(m.Require, m.Indexes, m.OdooSeries, previous.Packages)
 	if err != nil {
 		fatal(err)
 	}
@@ -64,11 +64,11 @@ func updateOne(m *manifest.Manifest, name string) {
 	if err != nil {
 		fatal(err)
 	}
-	lock, err := lockfile.Update(m.Require, m.Indexes, m.Odoo, previous.Packages, name)
+	lock, err := lockfile.Update(m.Require, m.Indexes, m.OdooSeries, previous.Packages, name)
 	if err != nil {
 		fatal(err)
 	}
-	if err := addonsdir.Claim(m.AddonsPath, lockedDirs(previous.Packages, lock.Packages)); err != nil {
+	if err := addonsdir.Claim(m.AddonsDir, lockedDirs(previous.Packages, lock.Packages)); err != nil {
 		fatal(err)
 	}
 	if err := lockfile.Save(lock); err != nil {

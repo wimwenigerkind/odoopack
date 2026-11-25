@@ -38,20 +38,20 @@ var doctorCmd = &cobra.Command{
 		}
 
 		switch {
-		case m.Odoo == "":
-			bad("odoo series not set (add \"odoo\": \"19.0\" to odoopack.json)")
-		case !seriesPattern.MatchString(m.Odoo):
-			bad("odoo %q is not a valid series (expected like 19.0)", m.Odoo)
+		case m.OdooSeries == "":
+			bad("odoo series not set (add \"odoo_series\": \"19.0\" to odoopack.json)")
+		case !seriesPattern.MatchString(m.OdooSeries):
+			bad("odoo_series %q is not a valid series (expected like 19.0)", m.OdooSeries)
 		default:
-			ok("odoo series: %s", m.Odoo)
+			ok("odoo series: %s", m.OdooSeries)
 		}
 
 		if wd, err := os.Getwd(); err != nil {
-			bad("addons_path: %v", err)
-		} else if err := addonsdir.Check(wd, m.AddonsPath); err != nil {
+			bad("addons_dir: %v", err)
+		} else if err := addonsdir.Check(wd, m.AddonsDir); err != nil {
 			bad("%v", err)
 		} else {
-			ok("addons_path: %s", m.AddonsPath)
+			ok("addons_dir: %s", m.AddonsDir)
 		}
 
 		if len(m.Indexes) == 0 {
@@ -77,14 +77,14 @@ var doctorCmd = &cobra.Command{
 				bad("require %s: invalid constraint %q (%v)", name, constraint, err)
 				continue
 			}
-			if v, err := version.Parse(constraint); err == nil && v.IsRelease() && m.Odoo != "" && v.SeriesString() != m.Odoo {
-				warn("require %s pins %s which targets Odoo %s, but the project is %s", name, constraint, v.SeriesString(), m.Odoo)
+			if v, err := version.Parse(constraint); err == nil && v.IsRelease() && m.OdooSeries != "" && v.SeriesString() != m.OdooSeries {
+				warn("require %s pins %s which targets Odoo %s, but the project is %s", name, constraint, v.SeriesString(), m.OdooSeries)
 			}
 		}
 
 		if lf, err := lockfile.Load(); err != nil {
 			warn("no lockfile found (run 'odoopack install')")
-		} else if stale, err := lockfile.IsStale(m.Require, m.Indexes, m.Odoo, lf.Packages, lf.ContentHash); err == nil && stale {
+		} else if stale, err := lockfile.IsStale(m.Require, m.Indexes, m.OdooSeries, lf.Packages, lf.ContentHash); err == nil && stale {
 			warn("lockfile is out of date (run 'odoopack install')")
 		} else {
 			ok("lockfile up to date (%d package(s))", len(lf.Packages))
