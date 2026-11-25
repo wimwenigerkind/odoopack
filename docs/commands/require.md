@@ -31,7 +31,7 @@ Aliases: `add`, `req`.
 2. Resolves the addon through the configured [indexes](index-command.md).
 3. Resolves all requirements again, including the new one and its dependencies. A [conflict](../reference/lockfile.md#resolution) stops here, before anything is written.
 4. Adds the requirement to `odoopack.json`.
-5. Writes the resolved versions, distribution types, URLs, references, checksums, and index names to `odoopack.lock` and recomputes its content hash.
+5. Writes the resolved versions, distribution types, URLs, references, checksums, and index URLs to `odoopack.lock` and recomputes its content hash.
 6. Installs every package that is new or whose locked version or distribution changed, and deletes the directories of packages that are no longer locked. Packages that did not change are left as they are.
 
 To add many addons at once, run `require` per addon, or edit `odoopack.json` and run [`install`](install.md).

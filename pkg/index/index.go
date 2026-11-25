@@ -3,6 +3,7 @@ package index
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"sort"
 	"strings"
 
@@ -19,9 +20,9 @@ type AddonVersion struct {
 	Reference  string
 	Shasum     string
 	Depends    []Dep
-	// Index names the index the addon came from. Lookup sets it, a Provider
-	// does not know it.
-	Index string
+	// Registry is the normalized URL of the index the addon came from. Lookup
+	// sets it, a Provider does not know it.
+	Registry string
 }
 
 type Dep struct {
@@ -99,32 +100,55 @@ func UsesImplicitDefault(indexes manifest.Indexes, defaultURL string) bool {
 	return true
 }
 
-// Searches reports whether name is one of the indexes LookupLocked searches,
-// the implicit default index included.
-func Searches(indexes manifest.Indexes, name string) bool {
-	for _, ni := range searchOrder(indexes) {
-		if ni.name == name {
-			return true
-		}
+// NormalizeURL is the form a registry URL is locked under: scheme and host
+// in lower case, no trailing slash, so that two spellings of one index lock
+// the same.
+func NormalizeURL(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return strings.TrimRight(raw, "/")
 	}
-	return false
+	u.Scheme = strings.ToLower(u.Scheme)
+	u.Host = strings.ToLower(u.Host)
+	u.Path = strings.TrimRight(u.Path, "/")
+	u.RawPath = ""
+	return u.String()
 }
 
-// LookupLocked resolves an addon from lockedIndex only, when that index still
-// exists. Otherwise it tries the indexes of the manifest in alphabetical order
-// and the implicit default index last.
-func LookupLocked(indexes manifest.Indexes, lockedIndex, name, constraint, odooSeries string) (AddonVersion, error) {
+// locatedBy reports whether locked points at ni. A package is locked to the
+// URL of its index, so renaming the index does not change the lockfile.
+// Lockfiles written before that hold the name of the index instead.
+func (ni namedIndex) locatedBy(locked string) bool {
+	return locked != "" && (NormalizeURL(ni.index.Url) == locked || ni.name == locked)
+}
+
+// LockedRegistry returns the normalized URL of the index LookupLocked asks
+// for a package locked to locked, and false when no index searched matches.
+func LockedRegistry(indexes manifest.Indexes, locked string) (string, bool) {
+	for _, ni := range searchOrder(indexes) {
+		if ni.locatedBy(locked) {
+			return NormalizeURL(ni.index.Url), true
+		}
+	}
+	return "", false
+}
+
+// LookupLocked resolves an addon from the index locked points at only, when
+// that index still exists. locked is the URL of the index or, in a lockfile
+// written before URLs were locked, its name. Otherwise it tries the indexes
+// of the manifest in alphabetical order and the implicit default index last.
+func LookupLocked(indexes manifest.Indexes, locked, name, constraint, odooSeries string) (AddonVersion, error) {
 	order := searchOrder(indexes)
 
 	for _, ni := range order {
-		if lockedIndex == "" || ni.name != lockedIndex {
+		if !ni.locatedBy(locked) {
 			continue
 		}
 		result, err := lookupIn(ni.index, name, constraint, odooSeries)
 		if err != nil {
 			return AddonVersion{}, fmt.Errorf("addon %q@%s is locked to index %s (%s): %w", name, constraint, ni.name, ni.index.Url, err)
 		}
-		result.Index = ni.name
+		result.Registry = NormalizeURL(ni.index.Url)
 		return result, nil
 	}
 
@@ -132,7 +156,7 @@ func LookupLocked(indexes manifest.Indexes, lockedIndex, name, constraint, odooS
 	for _, ni := range order {
 		result, err := lookupIn(ni.index, name, constraint, odooSeries)
 		if err == nil {
-			result.Index = ni.name
+			result.Registry = NormalizeURL(ni.index.Url)
 			return result, nil
 		}
 		if !errors.Is(err, ErrNotFound) {

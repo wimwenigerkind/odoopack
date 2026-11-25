@@ -107,8 +107,35 @@ func Save(lockFile LockFile) error {
 }
 
 // ComputeHash covers everything the packages were resolved from, so that a
-// change to any of it makes the lockfile stale.
+// change to any of it makes the lockfile stale. The indexes take part by URL
+// and type only: packages are locked to the URL, so renaming an index leaves
+// the lockfile fresh.
 func ComputeHash(require map[string]string, indexes manifest.Indexes, odoo string, packages map[string]LockedPackage) (string, error) {
+	return hashJSON(struct {
+		Require  map[string]string        `json:"require"`
+		Indexes  []manifest.Index         `json:"indexes"`
+		Odoo     string                   `json:"odoo"`
+		Packages map[string]LockedPackage `json:"packages"`
+	}{Require: require, Indexes: hashedIndexes(indexes), Odoo: odoo, Packages: packages})
+}
+
+func hashedIndexes(indexes manifest.Indexes) []manifest.Index {
+	list := make([]manifest.Index, 0, len(indexes))
+	for _, idx := range indexes {
+		list = append(list, manifest.Index{Url: index.NormalizeURL(idx.Url), Type: idx.Type})
+	}
+	sort.Slice(list, func(i, j int) bool {
+		if list[i].Url != list[j].Url {
+			return list[i].Url < list[j].Url
+		}
+		return list[i].Type < list[j].Type
+	})
+	return list
+}
+
+// namedHash is content_hash as odoopack computed it while packages were
+// locked to the name of their index.
+func namedHash(require map[string]string, indexes manifest.Indexes, odoo string, packages map[string]LockedPackage) (string, error) {
 	return hashJSON(struct {
 		Require  map[string]string        `json:"require"`
 		Indexes  manifest.Indexes         `json:"indexes"`
@@ -143,6 +170,17 @@ func IsStale(require map[string]string, indexes manifest.Indexes, odoo string, p
 		return false, err
 	}
 	if computedHash == hash {
+		return false, nil
+	}
+
+	// Lockfiles hashed the way an older odoopack did are still fresh, so that
+	// upgrading odoopack does not make install --frozen-lockfile fail in every
+	// project. The next write hashes them the current way.
+	named, err := namedHash(require, indexes, odoo, packages)
+	if err != nil {
+		return false, err
+	}
+	if named == hash {
 		return false, nil
 	}
 
@@ -305,10 +343,14 @@ func (r *resolver) lock(name string, req requirement, pinned bool) (LockedPackag
 	_, direct := r.require[name]
 	if pkg, ok := r.locked[name]; ok && pinned && r.keeps(pkg, req, direct) {
 		pkg.Direct = direct
+		// keeps found the index, so this replaces the name an older lockfile
+		// holds with its URL.
+		pkg.Registry, _ = index.LockedRegistry(r.indexes, pkg.LockedTo())
+		pkg.Index = ""
 		return pkg, nil
 	}
 
-	lookup, err := index.LookupLocked(r.indexes, r.locked[name].Index, name, req.constraint, r.odooSeries)
+	lookup, err := index.LookupLocked(r.indexes, r.locked[name].LockedTo(), name, req.constraint, r.odooSeries)
 	if err != nil {
 		return LockedPackage{}, err
 	}
@@ -337,7 +379,7 @@ func (r *resolver) keeps(pkg LockedPackage, req requirement, direct bool) bool {
 	if direct && !pkg.Direct || !satisfies(req.constraint, pkg.Version) || pkg.Dist.CheckIntegrity() != nil {
 		return false
 	}
-	if !index.Searches(r.indexes, pkg.Index) {
+	if _, ok := index.LockedRegistry(r.indexes, pkg.LockedTo()); !ok {
 		return false
 	}
 	v, err := version.Parse(pkg.Version)
@@ -403,7 +445,7 @@ func lockPackage(lookup index.AddonVersion, direct bool, deps, external []string
 		Direct:   direct,
 		Depends:  deps,
 		External: external,
-		Index:    lookup.Index,
+		Registry: lookup.Registry,
 	}
 	if err := pkg.Dist.CheckIntegrity(); err != nil {
 		return LockedPackage{}, fmt.Errorf("%s %s: %w", lookup.Name, lookup.Version, err)
