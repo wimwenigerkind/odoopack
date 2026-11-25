@@ -35,10 +35,10 @@ The manifest describes your project: which addons it requires and which registri
 | `$schema` | string | Optional. URL of a JSON Schema for editor completion and validation. odoopack keeps it and does not read it. |
 | `format_version` | integer | Version of the manifest format, currently `1`. A manifest without it is version 1. odoopack refuses a manifest with a higher version than it knows and asks you to upgrade odoopack; it always writes the current version. Adding an optional field does not raise it. Not part of the lockfile's `content_hash`. |
 | `name` | string | Project name. |
-| `odoo_series` | string | Required. Odoo series the project targets, two numbers such as `19.0`. Written by [`init`](../commands/init.md) from `--odoo`. Every requirement and dependency is resolved for this series. |
-| `require` | object | Map of package name to constraint. A package name is `vendor/name` or `name` of lowercase letters, digits, `_` and `-`. A constraint is an exact release (`19.0.1.0.0`), a series (`19.0`, the newest release of the series) or a branch build (`dev-19.0`), without surrounding spaces. |
+| `odoo_series` | string | Required. Odoo series the project targets, two numbers without leading zeros such as `19.0`. Written by [`init`](../commands/init.md) from `--odoo`. Every requirement and dependency is resolved for this series. |
+| `require` | object | Map of package name to constraint. A package name is `vendor/name` or `name` of lowercase letters, digits, `_` and `-`. The constraint takes one of the forms in [Constraints](#constraints). |
 | `indexes` | array | Registries to resolve addons from, in the order they are searched. Only these are searched: there is no implicit registry. [`init`](../commands/init.md) adds the built-in default registry as the index `default`. |
-| `addons_dir` | string | Directory addons are installed into. Defaults to `addons/odoopack`. Must be a relative path that resolves, also through symlinks, to a directory strictly inside the project, not the project directory itself. odoopack owns this directory: it writes a `.odoopack` marker into it and refuses to clear a non-empty directory without the marker. See [install](../commands/install.md#the-odoopack-marker). |
+| `addons_dir` | string | Directory addons are installed into. Defaults to `addons/odoopack`. Must be a relative path with `/` as separator, also on Windows, that resolves, also through symlinks, to a directory strictly inside the project, not the project directory itself. odoopack owns this directory: it writes a `.odoopack` marker into it and refuses to clear a non-empty directory without the marker. See [install](../commands/install.md#the-odoopack-marker). |
 | `extra` | object | Optional. Free-form data for other tools, such as deployment settings. odoopack keeps it as it is and never warns about it. |
 
 ### `indexes[]`
@@ -50,6 +50,34 @@ The manifest describes your project: which addons it requires and which registri
 | `type` | string | Index type. `registry` is currently the only type. An unknown type is refused with a request to upgrade odoopack, instead of skipping the index and resolving the addon elsewhere. |
 
 Indexes are tried in their order during resolution, and only an index that does not have the addon passes it on to the next one. Put a private registry before a public one, so that a name both have resolves to the private addon. See [index](../commands/index-command.md#resolution-order).
+
+## Constraints
+
+A constraint in `require` takes exactly one of three forms. Each keeps its meaning in every release of format version 1.
+
+| Form | Example | Meaning |
+| --- | --- | --- |
+| Release | `19.0.1.0.0` | Exactly this release. Five numbers separated by `.`, without leading zeros; the first two are the Odoo series and must match `odoo_series`. |
+| Series | `19.0` | The newest release of the series, resolved when the lockfile is written and pinned there until the package is resolved again, by `odoopack update` or by `odoopack install` on a stale lockfile. `require` writes this form when no version is given. |
+| Branch build | `dev-19.0` | The head of a branch, pinned in the lockfile by its commit. The branch name takes `A-Z`, `a-z`, `0-9`, `.`, `_`, `/` and `-`, must not contain `..`, start with `-` or `/`, or end with `/` or `.lock`. |
+
+Anything else is refused, such as `latest`, `^19.0`, `>=19.0.1.0.0`, `19.0.*` or `19.0.1`. The characters `^`, `~`, `<`, `>`, `=`, `*`, `|`, `,` and whitespace are reserved for a range syntax a later format version may add.
+
+A dependency of a locked package is met by any release of `odoo_series` and by any branch build, since Odoo depends on a module, not on a version of it. See [Resolution](lockfile.md#resolution).
+
+## Reserved keys
+
+These top-level keys are reserved for later releases. odoopack does not use them yet and keeps them like any other unknown key, but they may get a meaning, so do not use them for data of your own; use `extra` instead.
+
+| Key | Intended meaning |
+| --- | --- |
+| `require_dev` | Packages for development and tests only, like `require` |
+| `conflict` | Packages that must not be installed together with this project |
+| `replace` | Packages this project provides itself |
+| `scripts` | Commands to run on install or update |
+| `config` | Settings of odoopack for this project |
+| `description` | A description of the project |
+| `license` | The license of the project as an SPDX expression |
 
 ## Validation
 
