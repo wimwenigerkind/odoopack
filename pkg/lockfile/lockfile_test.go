@@ -128,12 +128,19 @@ func TestLockPackageRequiresIntegrity(t *testing.T) {
 		{"git with tag", index.AddonVersion{Type: "git", Reference: "19.0.1.0.0"}, "must be a full commit id"},
 		{"git with uppercase commit", index.AddonVersion{Type: "git", Reference: strings.ToUpper(commit)}, "must be a full commit id"},
 		{"unknown type", index.AddonVersion{Type: "svn", Shasum: shasum}, `type "svn"`},
+		{"zip over http", index.AddonVersion{Type: "zip", Shasum: shasum, Repository: "http://registry.example.com/zipball/x"}, "must use https"},
+		{"zip over http to localhost", index.AddonVersion{Type: "zip", Shasum: shasum, Repository: "http://localhost:8080/zipball/x"}, ""},
+		{"zip over http to loopback", index.AddonVersion{Type: "zip", Shasum: shasum, Repository: "http://127.0.0.1:8080/zipball/x"}, ""},
+		{"zip with relative url", index.AddonVersion{Type: "zip", Shasum: shasum, Repository: "/zipball/x"}, "not an absolute url"},
+		{"zip with credentials over http", index.AddonVersion{Type: "zip", Shasum: shasum, Repository: "http://user:secret@registry.example.com/x"}, "must use https"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.lookup.Name = "acme/health-check"
 			tt.lookup.Version = "19.0.1.0.0"
-			tt.lookup.Repository = "https://registry.example.com/zipball/x"
+			if tt.lookup.Repository == "" {
+				tt.lookup.Repository = "https://registry.example.com/zipball/x"
+			}
 			pkg, err := lockPackage(tt.lookup, true, nil, nil)
 			if tt.wantErr == "" {
 				if err != nil {
@@ -146,6 +153,9 @@ func TestLockPackageRequiresIntegrity(t *testing.T) {
 			}
 			if err == nil || !strings.Contains(err.Error(), tt.wantErr) || !strings.Contains(err.Error(), "acme/health-check 19.0.1.0.0") {
 				t.Fatalf("got error %v, want one naming the package and containing %q", err, tt.wantErr)
+			}
+			if strings.Contains(err.Error(), "secret") {
+				t.Fatalf("error %v leaks the credentials", err)
 			}
 		})
 	}

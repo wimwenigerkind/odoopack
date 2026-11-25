@@ -88,14 +88,16 @@ func NewRequest(ctx context.Context, rawURL, token string) (*http.Request, error
 	if token == "" {
 		return req, nil
 	}
-	if req.URL.Scheme != "https" && !isLoopback(req.URL.Hostname()) {
+	if req.URL.Scheme != "https" && !IsLoopback(req.URL.Hostname()) {
 		return nil, fmt.Errorf("refusing to send the ODOOPACK_AUTH token for %s over %s: use https (plain http is only allowed for localhost)", req.URL.Redacted(), req.URL.Scheme)
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	return req, nil
 }
 
-func isLoopback(host string) bool {
+// IsLoopback reports whether host is this machine, the only place plain
+// http is allowed, for a registry under development.
+func IsLoopback(host string) bool {
 	if host == "localhost" {
 		return true
 	}
