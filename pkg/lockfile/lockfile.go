@@ -432,17 +432,7 @@ func (d Dist) CheckIntegrity() error {
 		if _, err := digest.Parse(d.Digest); err != nil {
 			return err
 		}
-		u, err := url.Parse(d.URL)
-		if err != nil || u.Host == "" {
-			return fmt.Errorf("zip url %q is not an absolute url", d.URL)
-		}
-		switch {
-		case u.Scheme == "https":
-			return nil
-		case u.Scheme == "http" && httpclient.IsLoopback(u.Hostname()):
-			return nil
-		}
-		return fmt.Errorf("zip url %s must use https (plain http is only allowed for localhost)", u.Redacted())
+		return checkZipURL(d.URL)
 	case "git":
 		if d.Reference == "" {
 			return fmt.Errorf("git has no reference to check out")
@@ -450,9 +440,80 @@ func (d Dist) CheckIntegrity() error {
 		if !isCommit(d.Reference) {
 			return fmt.Errorf("git reference %q must be a full commit id, 40 or 64 lowercase hex characters", d.Reference)
 		}
-		return nil
+		return checkGitURL(d.URL)
 	}
 	return fmt.Errorf("type %q must be \"zip\" or \"git\"", d.Type)
+}
+
+// checkZipURL accepts a stable https URL without credentials: the lockfile
+// is committed, so a token or a signed query in it would leak, and a signed
+// URL expires and leaves a lockfile that no longer installs.
+func checkZipURL(raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return fmt.Errorf("zip url %s is not an absolute url", redactURL(raw))
+	}
+	if err := checkStable(u, raw); err != nil {
+		return fmt.Errorf("zip url %s %w", redactURL(raw), err)
+	}
+	switch {
+	case u.Scheme == "https":
+		return nil
+	case u.Scheme == "http" && httpclient.IsLoopback(u.Hostname()):
+		return nil
+	}
+	return fmt.Errorf("zip url %s must use https (plain http is only allowed for localhost)", redactURL(raw))
+}
+
+// checkGitURL refuses credentials in a git URL for the same reason. An ssh
+// user such as git@ names the account, not a secret, so it stays allowed.
+func checkGitURL(raw string) error {
+	if !strings.Contains(raw, "://") {
+		return nil
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("git url %s is not a valid url", redactURL(raw))
+	}
+	if _, hasPassword := u.User.Password(); u.User != nil && (u.Scheme != "ssh" || hasPassword) {
+		return fmt.Errorf("git url %s must not contain credentials", redactURL(raw))
+	}
+	if err := checkStable(u, raw); err != nil {
+		return fmt.Errorf("git url %s %w", redactURL(raw), err)
+	}
+	return nil
+}
+
+// checkStable refuses what makes a dist URL secret or short-lived: user
+// info, a query or a fragment.
+func checkStable(u *url.URL, raw string) error {
+	switch {
+	case u.User != nil && u.Scheme != "ssh":
+		return fmt.Errorf("must not contain credentials")
+	case u.RawQuery != "" || u.ForceQuery:
+		return fmt.Errorf("must not have a query, which would expire or carry a token")
+	case u.Fragment != "" || strings.Contains(raw, "#"):
+		return fmt.Errorf("must not have a fragment")
+	}
+	return nil
+}
+
+// redactURL keeps user info and the query out of an error, which may end up
+// in a CI log: either can hold a token.
+func redactURL(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "(invalid url)"
+	}
+	if u.User != nil {
+		u.User = url.User("REDACTED")
+	}
+	if u.RawQuery != "" {
+		u.RawQuery = "REDACTED"
+	}
+	u.Fragment = ""
+	u.RawFragment = ""
+	return u.String()
 }
 
 // isCommit matches what the registry accepts as a reference: 40 hex
