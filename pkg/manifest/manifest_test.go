@@ -106,3 +106,84 @@ func TestLoadReadsLegacyKeys(t *testing.T) {
 		}
 	}
 }
+
+func TestSaveKeepsUnknownKeys(t *testing.T) {
+	path := useManifest(t, `{
+  "zeta": {"b": 1, "a": [true]},
+  "$schema": "https://example.com/manifest.json",
+  "format_version": 1,
+  "name": "test",
+  "description": "kept",
+  "odoo_series": "19.0",
+  "require": {},
+  "indexes": {"company": {"priority": 10, "url": "https://registry.example.com", "type": "registry"}},
+  "addons_dir": "addons/odoopack",
+  "extra": {"acme": {"team": "core"}}
+}`)
+
+	m, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := strings.Join(m.UnknownKeys(), ","), "description,indexes.company.priority,zeta"; got != want {
+		t.Fatalf("got unknown keys %s, want %s", got, want)
+	}
+	if err := Save(*m); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := `{
+  "$schema": "https://example.com/manifest.json",
+  "format_version": 1,
+  "name": "test",
+  "odoo_series": "19.0",
+  "require": {},
+  "indexes": {
+    "company": {
+      "url": "https://registry.example.com",
+      "type": "registry",
+      "priority": 10
+    }
+  },
+  "addons_dir": "addons/odoopack",
+  "extra": {
+    "acme": {
+      "team": "core"
+    }
+  },
+  "description": "kept",
+  "zeta": {
+    "b": 1,
+    "a": [
+      true
+    ]
+  }
+}`
+	if string(data) != want {
+		t.Fatalf("got\n%s\nwant\n%s", data, want)
+	}
+}
+
+func TestLoadRejectsExtraThatIsNotAnObject(t *testing.T) {
+	useManifest(t, `{"name":"test","odoo_series":"19.0","addons_dir":"addons/odoopack","extra":[1]}`)
+
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "extra must be an object") {
+		t.Fatalf("got error %v, want one about extra", err)
+	}
+}
+
+func TestLegacyKeysAreNotUnknown(t *testing.T) {
+	useManifest(t, `{"name":"test","odoo":"19.0","addons_path":"addons/odoopack"}`)
+
+	m, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if keys := m.UnknownKeys(); len(keys) != 0 {
+		t.Fatalf("got unknown keys %v, want none", keys)
+	}
+}

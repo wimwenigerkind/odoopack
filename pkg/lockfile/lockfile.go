@@ -120,7 +120,7 @@ func Save(lockFile LockFile) error {
 func ComputeHash(require map[string]string, indexes manifest.Indexes, odoo string, packages map[string]LockedPackage) (string, error) {
 	return hashJSON(struct {
 		Require  map[string]string        `json:"require"`
-		Indexes  []manifest.Index         `json:"indexes"`
+		Indexes  []hashedIndex            `json:"indexes"`
 		Odoo     string                   `json:"odoo"`
 		Packages map[string]hashedPackage `json:"packages"`
 	}{Require: require, Indexes: hashedIndexes(indexes), Odoo: odoo, Packages: hashedPackages(packages)})
@@ -162,10 +162,18 @@ func hashedPackages(packages map[string]LockedPackage) map[string]hashedPackage 
 	return hashed
 }
 
-func hashedIndexes(indexes manifest.Indexes) []manifest.Index {
-	list := make([]manifest.Index, 0, len(indexes))
+// hashedIndex is an index as content_hash covers it: keys of the index this
+// odoopack does not know stay out, so that a newer odoopack adding one does
+// not make the lockfile stale for an older one.
+type hashedIndex struct {
+	Url  string `json:"url"`
+	Type string `json:"type"`
+}
+
+func hashedIndexes(indexes manifest.Indexes) []hashedIndex {
+	list := make([]hashedIndex, 0, len(indexes))
 	for _, idx := range indexes {
-		list = append(list, manifest.Index{Url: index.NormalizeURL(idx.Url), Type: idx.Type})
+		list = append(list, hashedIndex{Url: index.NormalizeURL(idx.Url), Type: idx.Type})
 	}
 	sort.Slice(list, func(i, j int) bool {
 		if list[i].Url != list[j].Url {
@@ -176,15 +184,25 @@ func hashedIndexes(indexes manifest.Indexes) []manifest.Index {
 	return list
 }
 
+// namedIndexes is indexes as namedHash and legacyHash cover them, keyed by
+// name and with the URL as written.
+func namedIndexes(indexes manifest.Indexes) map[string]hashedIndex {
+	named := make(map[string]hashedIndex, len(indexes))
+	for name, idx := range indexes {
+		named[name] = hashedIndex{Url: idx.Url, Type: idx.Type}
+	}
+	return named
+}
+
 // namedHash is content_hash as odoopack computed it while packages were
 // locked to the name of their index.
 func namedHash(require map[string]string, indexes manifest.Indexes, odoo string, packages map[string]LockedPackage) (string, error) {
 	return hashJSON(struct {
 		Require  map[string]string        `json:"require"`
-		Indexes  manifest.Indexes         `json:"indexes"`
+		Indexes  map[string]hashedIndex   `json:"indexes"`
 		Odoo     string                   `json:"odoo"`
 		Packages map[string]hashedPackage `json:"packages"`
-	}{Require: require, Indexes: indexes, Odoo: odoo, Packages: hashedPackages(packages)})
+	}{Require: require, Indexes: namedIndexes(indexes), Odoo: odoo, Packages: hashedPackages(packages)})
 }
 
 // legacyHash is content_hash as odoopack computed it before the series was
@@ -192,9 +210,9 @@ func namedHash(require map[string]string, indexes manifest.Indexes, odoo string,
 func legacyHash(require map[string]string, indexes manifest.Indexes, packages map[string]LockedPackage) (string, error) {
 	return hashJSON(struct {
 		Require  map[string]string        `json:"require"`
-		Indexes  manifest.Indexes         `json:"indexes"`
+		Indexes  map[string]hashedIndex   `json:"indexes"`
 		Packages map[string]hashedPackage `json:"packages"`
-	}{Require: require, Indexes: indexes, Packages: hashedPackages(packages)})
+	}{Require: require, Indexes: namedIndexes(indexes), Packages: hashedPackages(packages)})
 }
 
 func hashJSON(payload any) (string, error) {
