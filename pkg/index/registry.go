@@ -112,7 +112,7 @@ func (p *RegistryProvider) Lookup(addonName, constraint, odooSeries string) (Add
 		Type:       match.Type,
 		Repository: match.URL,
 		Reference:  match.Reference,
-		Shasum:     match.Shasum,
+		Digest:     match.Digest,
 		Depends:    deps,
 	}, nil
 }

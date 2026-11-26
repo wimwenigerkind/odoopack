@@ -19,7 +19,7 @@ import (
 
 // release is a version of an addon whose zipball is dist.
 func release(dist lockfile.Dist, version string, depends ...string) registryapi.Version {
-	v := registryapi.Version{Version: version, Type: registryapi.TypeZip, URL: dist.URL, Shasum: dist.Digest}
+	v := registryapi.Version{Version: version, Type: registryapi.TypeZip, URL: dist.URL, Digest: dist.Digest}
 	for _, d := range depends {
 		v.Depends = append(v.Depends, registryapi.Dep{Module: name.ModuleName(d), Package: d, Access: registryapi.AccessOK})
 	}
@@ -224,8 +224,8 @@ func TestRemoveRefusesWhileDependedOn(t *testing.T) {
 		return
 	}
 
-	shasum := "sha256:ece96e65881389c3ef6538ea26b9d7149e8e0af042c828d17283c6b76c633543"
-	dist := lockfile.Dist{Type: "zip", URL: "https://example.com/x.zip", Digest: shasum}
+	zipDigest := "sha256:ece96e65881389c3ef6538ea26b9d7149e8e0af042c828d17283c6b76c633543"
+	dist := lockfile.Dist{Type: "zip", URL: "https://example.com/x.zip", Digest: zipDigest}
 	url := "http://127.0.0.1:1"
 	lock, err := json.Marshal(lockfile.LockFile{FormatVersion: lockfile.FormatVersion, ContentHash: "sha256:00", Packages: map[string]lockfile.LockedPackage{
 		"acme/health-check": lockedAt("acme/health-check", url, dist, "19.0.1.0.0", true, "acme/base-tools"),

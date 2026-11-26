@@ -406,7 +406,7 @@ func lockPackage(lookup index.AddonVersion, direct bool, deps, external []string
 			Type:      lookup.Type,
 			URL:       lookup.Repository,
 			Reference: lookup.Reference,
-			Digest:    lookup.Shasum,
+			Digest:    lookup.Digest,
 		},
 		Direct:          direct,
 		Depends:         deps,
