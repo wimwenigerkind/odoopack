@@ -320,7 +320,7 @@ func (r *resolver) lock(name string, req requirement, pinned bool) (LockedPackag
 			}
 		}
 	}
-	return lockPackage(lookup, direct, deps, external)
+	return lockPackage(lookup, r.locked[name].Module, direct, deps, external)
 }
 
 // keeps reports whether a locked package can stay as it is. A required
@@ -385,10 +385,15 @@ func satisfies(constraint, v string) bool {
 
 // lockPackage refuses a version whose content cannot be verified at install,
 // whatever index it came from.
-func lockPackage(lookup index.AddonVersion, direct bool, deps, external []string) (LockedPackage, error) {
+// lockPackage keeps module, the one a package was locked with before, so
+// that resolving it again does not move its directory.
+func lockPackage(lookup index.AddonVersion, module string, direct bool, deps, external []string) (LockedPackage, error) {
+	if module == "" {
+		module = name.ModuleName(lookup.Name)
+	}
 	pkg := LockedPackage{
 		Version: lookup.Version,
-		Module:  name.ModuleName(lookup.Name),
+		Module:  module,
 		Dist: Dist{
 			Type:      lookup.Type,
 			URL:       lookup.Repository,

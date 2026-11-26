@@ -412,3 +412,17 @@ func TestRelockKeepsUnknownKeysOfKeptPackages(t *testing.T) {
 		t.Fatalf("plan installs %v, want only acme/other: unknown keys must not count as a change", install)
 	}
 }
+
+func TestUpdateKeepsLockedModule(t *testing.T) {
+	indexes, _ := singleIndex(t, registryapi.Addon{Name: "acme/health-check", Versions: []registryapi.Version{release("19.0.1.0.0"), release("19.0.2.0.0")}})
+	old := locked("acme/health-check", indexes[0].Url, "19.0.1.0.0", true)
+	old.Module = "health_check"
+
+	lf, err := Update(map[string]string{"acme/health-check": "19.0"}, indexes, "19.0", map[string]LockedPackage{"acme/health-check": old}, "acme/health-check")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := lf.Packages["acme/health-check"]; got.Version != "19.0.2.0.0" || got.Module != "health_check" {
+		t.Fatalf("locked %+v, want 19.0.2.0.0 in the module it was locked with", got)
+	}
+}
