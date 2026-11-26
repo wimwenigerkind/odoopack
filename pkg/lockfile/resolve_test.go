@@ -2,6 +2,7 @@ package lockfile
 
 import (
 	"encoding/json"
+	"encoding/json/jsontext"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -391,5 +392,24 @@ func TestChangedRegistryURLResolvesAgain(t *testing.T) {
 	}
 	if hits.Load() == 0 {
 		t.Error("a package locked to a registry no index points at was kept without asking index a")
+	}
+}
+
+func TestRelockKeepsUnknownKeysOfKeptPackages(t *testing.T) {
+	indexes, _ := singleIndex(t, addon("acme/other"))
+	kept := locked("acme/health-check", indexes[0].Url, "19.0.1.0.0", true)
+	kept.Unknown = map[string]jsontext.Value{"provenance": jsontext.Value(`{"builder":"ci"}`)}
+	kept.Dist.Unknown = map[string]jsontext.Value{"size": jsontext.Value(`1234`)}
+
+	lf, err := Relock(map[string]string{"acme/health-check": "19.0", "acme/other": "19.0"}, indexes, "19.0", map[string]LockedPackage{"acme/health-check": kept})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := lf.Packages["acme/health-check"]
+	if string(got.Unknown["provenance"]) != `{"builder":"ci"}` || string(got.Dist.Unknown["size"]) != `1234` {
+		t.Fatalf("relocking dropped the unknown keys of a kept package: %+v", got)
+	}
+	if install, _ := Plan(map[string]LockedPackage{"acme/health-check": locked("acme/health-check", indexes[0].Url, "19.0.1.0.0", true)}, lf.Packages); len(install) != 1 || install[0] != "acme/other" {
+		t.Fatalf("plan installs %v, want only acme/other: unknown keys must not count as a change", install)
 	}
 }

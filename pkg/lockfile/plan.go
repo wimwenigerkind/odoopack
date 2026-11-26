@@ -8,7 +8,7 @@ import "sort"
 func Plan(prev, next map[string]LockedPackage) (install, remove []string) {
 	for name, pkg := range next {
 		old, ok := prev[name]
-		if !ok || old.Version != pkg.Version || old.Dist != pkg.Dist {
+		if !ok || old.Version != pkg.Version || !old.Dist.Same(pkg.Dist) {
 			install = append(install, name)
 		}
 	}
