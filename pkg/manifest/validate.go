@@ -186,11 +186,14 @@ func CanonicalURL(raw string) string {
 }
 
 // redact drops the user too, not only the password: it can be a token. So
-// can the query.
+// can the query. Without "//" Go keeps user and password in Opaque.
 func redact(raw string) string {
 	u, err := url.Parse(raw)
 	if err != nil {
 		return "(invalid url)"
+	}
+	if u.Opaque != "" {
+		return "(opaque url)"
 	}
 	if u.User != nil {
 		u.User = url.User("REDACTED")
