@@ -2,6 +2,7 @@ package lockfile
 
 import (
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -56,5 +57,24 @@ func TestDependents(t *testing.T) {
 	}
 	if got := Dependents(packages, "acme/a"); got != nil {
 		t.Errorf("Dependents() = %v, want none", got)
+	}
+}
+
+func TestPlanMovesChangedModule(t *testing.T) {
+	prev := map[string]LockedPackage{
+		"acme/health-check": {Version: "19.0.1.0.0", Module: "acme_health_check", Dist: Dist{Type: "zip", URL: "https://example.com/1.zip", Digest: "sha256:01"}},
+		"acme/other":        {Version: "19.0.1.0.0", Module: "acme_other", Dist: Dist{Type: "zip", URL: "https://example.com/2.zip", Digest: "sha256:02"}},
+	}
+	next := map[string]LockedPackage{
+		"acme/health-check": prev["acme/health-check"],
+		"acme/other":        prev["acme/other"],
+	}
+	moved := next["acme/health-check"]
+	moved.Module = "health_check"
+	next["acme/health-check"] = moved
+
+	install, remove := Plan(prev, next)
+	if strings.Join(install, ",") != "acme/health-check" || strings.Join(remove, ",") != "acme/health-check" {
+		t.Fatalf("got install %v and remove %v, want acme/health-check in both", install, remove)
 	}
 }

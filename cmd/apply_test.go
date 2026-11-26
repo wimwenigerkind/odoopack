@@ -66,8 +66,8 @@ func project(t *testing.T, m *manifest.Manifest, packages map[string]lockfile.Lo
 	if err := addonsdir.Claim(m.AddonsDir, nil); err != nil {
 		t.Fatal(err)
 	}
-	for pkg := range packages {
-		dir := filepath.Join(m.AddonsDir, name.ModuleName(pkg))
+	for _, pkg := range packages {
+		dir := filepath.Join(m.AddonsDir, pkg.Module)
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			t.Fatal(err)
 		}
@@ -243,5 +243,32 @@ func TestRemoveRefusesWhileDependedOn(t *testing.T) {
 	})
 	if !strings.Contains(out, "cannot remove acme/base-tools: acme/health-check, acme/other depend(s) on it") {
 		t.Fatalf("output does not name the dependents:\n%s", out)
+	}
+}
+
+func TestApplyLockMovesChangedModule(t *testing.T) {
+	dist := addonZip(t)
+	m := manifest.NewManifest("test", "addons/odoopack", "19.0")
+	m.Require = manifest.Requirements{"acme/health-check": "19.0"}
+	before := lockedAt("acme/health-check", "https://registry.example.com", dist, "19.0.1.0.0", true)
+	before.Module = "health_check"
+	project(t, m, map[string]lockfile.LockedPackage{"acme/health-check": before})
+	after := before
+	after.Module = "acme_health_check"
+
+	installed, removed, err := applyLock(m,
+		lockfile.LockFile{Packages: map[string]lockfile.LockedPackage{"acme/health-check": before}},
+		lockfile.LockFile{Packages: map[string]lockfile.LockedPackage{"acme/health-check": after}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if installed != 1 || removed != 1 {
+		t.Errorf("installed %d and removed %d, want 1 and 1", installed, removed)
+	}
+	if _, err := os.Stat(filepath.Join(m.AddonsDir, "health_check")); !os.IsNotExist(err) {
+		t.Errorf("the old module directory is still there: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(m.AddonsDir, "acme_health_check", "__manifest__.py")); err != nil {
+		t.Errorf("the package is not installed in its new module: %v", err)
 	}
 }
