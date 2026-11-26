@@ -1,6 +1,7 @@
 package manifest
 
 import (
+	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"os"
 	"strings"
@@ -70,5 +71,15 @@ func TestIndexesAddAndRemove(t *testing.T) {
 	}
 	if _, removed := ix.Remove("missing"); removed {
 		t.Fatal("removed an index that does not exist")
+	}
+}
+
+func TestIndexesAddKeepsUnknownKeys(t *testing.T) {
+	ix := Indexes{{Name: "company", Url: "https://old.example.com", Type: "registry", Unknown: map[string]jsontext.Value{"only": jsontext.Value(`["acme/*"]`)}}}
+
+	ix = ix.Add(Index{Name: "company", Url: "https://new.example.com", Type: "registry"}, false)
+
+	if len(ix) != 1 || ix[0].Url != "https://new.example.com" || string(ix[0].Unknown["only"]) != `["acme/*"]` {
+		t.Fatalf("got %+v, want the new url with the unknown key kept", ix)
 	}
 }
