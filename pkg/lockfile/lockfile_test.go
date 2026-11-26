@@ -152,7 +152,7 @@ func TestLockPackageRequiresIntegrity(t *testing.T) {
 			if tt.lookup.Repository == "" {
 				tt.lookup.Repository = "https://registry.example.com/zipball/x"
 			}
-			pkg, err := lockPackage(tt.lookup, true, nil, nil)
+			pkg, err := lockPackage(tt.lookup, "", true, nil, nil)
 			if tt.wantErr == "" {
 				if err != nil {
 					t.Fatal(err)
