@@ -19,8 +19,9 @@ odoopack init [flags]
 
 | Flag | Default | Description |
 | --- | --- | --- |
-| `-n`, `--name` | `odoopack` | Project name written to the manifest. |
+| `-n`, `--name` | the directory name | Project name written to the manifest, like a package name. Without the flag, `init` takes the name of the directory in lower case, with `-` for other characters, and writes no name when nothing valid is left. |
+| `--odoo` | `19.0` | Odoo series written as `odoo_series`. |
 
 ## Result
 
-The generated manifest contains the project name, an empty `require` map, the built-in default registry as the only index (named `default`, from `default_index_url`), the `odoo_series` from `--odoo`, and the default `addons_dir` (`addons/odoopack`). See [Manifest](../reference/manifest.md).
+The generated manifest contains the project name (if any), an empty `require` map, the built-in default registry as the only index (named `default`, from `default_index_url`), the `odoo_series` from `--odoo`, and the default `addons_dir` (`addons/odoopack`). See [Manifest](../reference/manifest.md).

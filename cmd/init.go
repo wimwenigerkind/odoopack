@@ -4,6 +4,8 @@ Copyright © 2026 Wim Wenigerkind
 package cmd
 
 import (
+	"os"
+
 	"github.com/spf13/cobra"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
 	"github.com/wimwenigerkind/odoopack/pkg/ui"
@@ -17,9 +19,20 @@ var initCmd = &cobra.Command{
 	Short: "Initialize a new odoopack project",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
+		if !cmd.Flags().Changed("name") {
+			wd, err := os.Getwd()
+			if err != nil {
+				fatal(err)
+			}
+			projectName = manifest.ProjectName(wd)
+		}
 		m, err := manifest.Init(projectName, odoo)
 		if err != nil {
 			fatal(err)
+		}
+		if m.Name == "" {
+			ui.Success("initialized project")
+			return
 		}
 		ui.Success("initialized project %q", m.Name)
 	},
@@ -27,6 +40,6 @@ var initCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(initCmd)
-	initCmd.Flags().StringVarP(&projectName, "name", "n", "odoopack", "Project name")
+	initCmd.Flags().StringVarP(&projectName, "name", "n", "", "project name, lower case like a package name (default: the name of the directory)")
 	initCmd.Flags().StringVar(&odoo, "odoo", "19.0", "Target Odoo series")
 }

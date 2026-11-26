@@ -73,7 +73,7 @@ type Manifest struct {
 	// FormatVersion stays out of content_hash, so that a lockfile does not
 	// become stale when its manifest gains the field.
 	FormatVersion int          `json:"format_version"`
-	Name          string       `json:"name"`
+	Name          string       `json:"name,omitzero"`
 	OdooSeries    string       `json:"odoo_series"`
 	Require       Requirements `json:"require"`
 	Indexes       Indexes      `json:"indexes"`

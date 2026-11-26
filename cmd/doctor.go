@@ -27,9 +27,7 @@ var doctorCmd = &cobra.Command{
 			fatal(err)
 		}
 
-		if m.Name == "" {
-			bad("name is empty")
-		} else {
+		if m.Name != "" {
 			ok("name: %s", m.Name)
 		}
 
