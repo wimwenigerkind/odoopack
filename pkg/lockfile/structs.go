@@ -1,10 +1,22 @@
 package lockfile
 
+import "encoding/json/jsontext"
+
 type Dist struct {
 	Type      string `json:"type"`
 	URL       string `json:"url"`
 	Reference string `json:"reference,omitempty"`
 	Digest    string `json:"digest,omitempty"`
+	// Unknown holds keys a newer odoopack wrote, such as a signature, which
+	// this one cannot compute again. They stay as long as the package is
+	// kept as it is; resolving it again drops them.
+	Unknown map[string]jsontext.Value `json:",embed"`
+}
+
+// Same reports whether d and o download the same content. Keys this
+// odoopack does not know play no part.
+func (d Dist) Same(o Dist) bool {
+	return d.Type == o.Type && d.URL == o.URL && d.Reference == o.Reference && d.Digest == o.Digest
 }
 
 type LockedPackage struct {
@@ -19,10 +31,13 @@ type LockedPackage struct {
 	Direct          bool     `json:"direct"`
 	Depends         []string `json:"depends,omitempty"`
 	ExternalModules []string `json:"external_modules,omitempty"`
-	// IndexURL is the normalized URL of the index the package was resolved
-	// from, so that later resolutions ask that index only, whatever it is
-	// named in the manifest.
+	// IndexURL is the URL of the index the package was resolved from, as
+	// the manifest writes it, so that later resolutions ask that index only,
+	// whatever it is named.
 	IndexURL string `json:"index_url,omitempty"`
+	// Unknown holds keys a newer odoopack wrote for the package, kept like
+	// those of Dist.
+	Unknown map[string]jsontext.Value `json:",embed"`
 }
 
 // FormatVersion is the lockfile format this odoopack writes. Raise it only

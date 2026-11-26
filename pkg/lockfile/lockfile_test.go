@@ -306,3 +306,45 @@ func TestComputeHashOfEmptyManifest(t *testing.T) {
 		}
 	}
 }
+
+func TestSaveKeepsUnknownPackageKeys(t *testing.T) {
+	path := useLock(t, `{
+  "format_version": 1,
+  "content_hash": "sha256:00",
+  "signature": "whole-file",
+  "packages": {
+    "acme/x": {
+      "version": "19.0.1.0.0",
+      "module": "acme_x",
+      "dist": {
+        "type": "git",
+        "url": "https://example.com/x.git",
+        "reference": "6b6c390a387c81ee604b602e49ca6c35646cc619",
+        "size": 1234
+      },
+      "direct": true,
+      "provenance": {"builder": "ci"}
+    }
+  }
+}`)
+
+	lf, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Save(lf); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, kept := range []string{`"size": 1234`, `"provenance": {`, `"builder": "ci"`} {
+		if !bytes.Contains(data, []byte(kept)) {
+			t.Errorf("lockfile lost %s:\n%s", kept, data)
+		}
+	}
+	if bytes.Contains(data, []byte(`"signature"`)) {
+		t.Errorf("lockfile kept a top-level key it does not know:\n%s", data)
+	}
+}
