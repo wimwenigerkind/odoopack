@@ -28,11 +28,12 @@ func (ix Indexes) Find(name string) int {
 }
 
 // Add puts a new index first, like Composer, since it is usually a private
-// registry that has to win over the public one; an existing one keeps its
-// position.
+// registry that has to win over the public one. An existing one keeps its
+// position and the keys a newer odoopack added, such as a filter.
 func (ix Indexes) Add(idx Index, last bool) Indexes {
 	switch i := ix.Find(idx.Name); {
 	case i >= 0:
+		idx.Unknown = ix[i].Unknown
 		ix[i] = idx
 		return ix
 	case last:
