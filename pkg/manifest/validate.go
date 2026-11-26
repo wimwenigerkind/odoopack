@@ -38,7 +38,7 @@ func (m Manifest) Validate() error {
 			errs = append(errs, err)
 			continue
 		}
-		if err := ValidConstraint(constraint); err != nil {
+		if err := ValidConstraint(constraint, m.OdooSeries); err != nil {
 			errs = append(errs, fmt.Errorf("require %s: %w", pkg, err))
 		}
 	}
@@ -98,13 +98,34 @@ func ValidAddonsDir(dir string) error {
 }
 
 // ValidConstraint reports whether constraint is one of the forms a
-// requirement takes: an exact release, a series or a dev branch.
-func ValidConstraint(constraint string) error {
+// requirement takes, an exact release, a series or a dev branch, and fits
+// series, the odoo_series of the project. A release carries its series; so
+// does a branch named after one, such as dev-18.0. Another branch name says
+// nothing about the series and is left to the registry.
+func ValidConstraint(constraint, series string) error {
 	if constraint != strings.TrimSpace(constraint) {
 		return fmt.Errorf("constraint %q has surrounding spaces", constraint)
 	}
-	_, err := version.ParseConstraint(constraint)
-	return err
+	if _, err := version.ParseConstraint(constraint); err != nil {
+		return err
+	}
+	if series == "" {
+		return nil
+	}
+	if ValidSeries(constraint) == nil {
+		if constraint != series {
+			return fmt.Errorf("series %s does not match odoo_series %s", constraint, series)
+		}
+		return nil
+	}
+	v, err := version.Parse(constraint)
+	if err != nil {
+		return err
+	}
+	if v.SeriesString() != "" && v.SeriesString() != series {
+		return fmt.Errorf("%s targets Odoo %s, but odoo_series is %s", constraint, v.SeriesString(), series)
+	}
+	return nil
 }
 
 func (idx Index) Validate() error {

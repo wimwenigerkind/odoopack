@@ -38,7 +38,7 @@ var requireCmd = &cobra.Command{
 		if constraint == "" {
 			constraint = m.OdooSeries
 		}
-		if err := manifest.ValidConstraint(constraint); err != nil {
+		if err := manifest.ValidConstraint(constraint, m.OdooSeries); err != nil {
 			fatal(fmt.Errorf("%s: %w", addon, err))
 		}
 
