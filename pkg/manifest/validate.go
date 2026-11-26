@@ -139,17 +139,18 @@ func (idx Index) Validate() error {
 func ValidIndexURL(raw string) error {
 	u, err := url.Parse(raw)
 	if err != nil {
-		return fmt.Errorf("invalid url %q: %w", raw, err)
+		// The parse error quotes the URL, credentials included.
+		return fmt.Errorf("url %s is not a valid url", redact(raw))
 	}
 	switch {
 	case u.Scheme != "http" && u.Scheme != "https":
-		return fmt.Errorf("url %q must start with https:// or http://", raw)
+		return fmt.Errorf("url %s must start with https:// or http://", redact(raw))
 	case u.Host == "":
-		return fmt.Errorf("url %q has no host", raw)
+		return fmt.Errorf("url %s has no host", redact(raw))
 	case u.User != nil:
-		return fmt.Errorf("url %q must not contain credentials; put the token in ODOOPACK_AUTH", redact(u))
+		return fmt.Errorf("url %s must not contain credentials; put the token in ODOOPACK_AUTH", redact(raw))
 	case u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || strings.Contains(raw, "#"):
-		return fmt.Errorf("url %q must not have a query or fragment", raw)
+		return fmt.Errorf("url %s must not have a query or fragment", redact(raw))
 	case strings.Contains(raw, "%"):
 		return fmt.Errorf("url %q must not contain percent escapes", raw)
 	}
@@ -184,8 +185,20 @@ func CanonicalURL(raw string) string {
 	return u.String()
 }
 
-func redact(u *url.URL) string {
-	c := *u
-	c.User = url.User("REDACTED")
-	return c.String()
+// redact drops the user too, not only the password: it can be a token. So
+// can the query.
+func redact(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "(invalid url)"
+	}
+	if u.User != nil {
+		u.User = url.User("REDACTED")
+	}
+	if u.RawQuery != "" {
+		u.RawQuery = "REDACTED"
+	}
+	u.Fragment = ""
+	u.RawFragment = ""
+	return u.String()
 }
