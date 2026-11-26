@@ -5,8 +5,11 @@ import (
 	"encoding/json/v2"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/spf13/viper"
+	"github.com/wimwenigerkind/odoopack-spec/name"
 	"github.com/wimwenigerkind/odoopack/pkg/helper"
 	"github.com/wimwenigerkind/odoopack/pkg/ui"
 )
@@ -67,6 +70,29 @@ func Save(manifest Manifest) error {
 		return err
 	}
 	return helper.WriteJSONFile(FileName, data)
+}
+
+// ProjectName turns the name of a directory into a project name: lower
+// case, every run of other characters a single "-". It returns "" when
+// nothing valid is left, and init then writes no name.
+func ProjectName(dir string) string {
+	var b strings.Builder
+	dash := false
+	for _, r := range strings.ToLower(filepath.Base(dir)) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '_':
+			b.WriteRune(r)
+			dash = false
+		case !dash && b.Len() > 0:
+			b.WriteByte('-')
+			dash = true
+		}
+	}
+	project := strings.Trim(b.String(), "-_")
+	if name.ValidPackage(project) != nil {
+		return ""
+	}
+	return project
 }
 
 func Init(name, odoo string) (Manifest, error) {

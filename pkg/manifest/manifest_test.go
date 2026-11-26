@@ -175,7 +175,7 @@ func TestLoadMatchesKeysExactly(t *testing.T) {
 }
 
 func TestSaveDoesNotEscapeHTML(t *testing.T) {
-	path := useManifest(t, `{"name":"a&b","odoo_series":"19.0","addons_dir":"addons/odoopack","extra":{"note":"<x>"}}`)
+	path := useManifest(t, `{"name":"test","odoo_series":"19.0","addons_dir":"addons/odoopack","extra":{"note":"<x> & <y>"}}`)
 
 	m, err := Load()
 	if err != nil {
@@ -188,7 +188,23 @@ func TestSaveDoesNotEscapeHTML(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Contains(data, []byte(`"a&b"`)) || !bytes.Contains(data, []byte(`"<x>"`)) {
+	if !bytes.Contains(data, []byte(`"<x> & <y>"`)) {
 		t.Fatalf("manifest escapes HTML:\n%s", data)
+	}
+}
+
+func TestProjectName(t *testing.T) {
+	for dir, want := range map[string]string{
+		"/home/dev/acme-project":     "acme-project",
+		"/home/dev/My Project (old)": "my-project-old",
+		"/home/dev/Odoo_19":          "odoo_19",
+		"/home/dev/__init__":         "init",
+		"/home/dev/Ünï":              "n",
+		"/home/dev/---":              "",
+		"/":                          "",
+	} {
+		if got := ProjectName(dir); got != want {
+			t.Errorf("ProjectName(%q) = %q, want %q", dir, got, want)
+		}
 	}
 }

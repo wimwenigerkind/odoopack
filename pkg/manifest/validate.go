@@ -30,6 +30,13 @@ var (
 // fixed in one go.
 func (m Manifest) Validate() error {
 	var errs []error
+	// name is optional, but takes the grammar of a package name, so that it
+	// can name the project as a package later.
+	if m.Name != "" {
+		if err := name.ValidPackage(m.Name); err != nil {
+			errs = append(errs, fmt.Errorf("name %q must be written like a package name: %w", m.Name, err))
+		}
+	}
 	if err := ValidSeries(m.OdooSeries); err != nil {
 		errs = append(errs, err)
 	}
