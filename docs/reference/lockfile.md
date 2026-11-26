@@ -77,8 +77,8 @@ Nothing is written when resolution fails. Dependencies carry only the series for
 
 1. Take this JSON object from the manifest:
    - `odoo_series`: the string as written.
-   - `require`: the object as written.
-   - `indexes`: an array with one object `{"type": ..., "url": ...}` per index, the URL exactly as the manifest writes it, sorted by `url` and then by `type`. The manifest only takes the [canonical form](manifest.md#indexes) of a URL, so there is nothing to normalize.
+   - `require`: the object as written, `{}` when the manifest has none.
+   - `indexes`: an array with one object `{"type": ..., "url": ...}` per index, the URL exactly as the manifest writes it, sorted by `url` and then by `type`, `[]` when the manifest has none. The manifest only takes the [canonical form](manifest.md#indexes) of a URL, so there is nothing to normalize.
 2. Serialize it in the canonical form of [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785) (JSON Canonicalization Scheme).
 3. Take the SHA-256 of those bytes and write it as `sha256:` followed by the lowercase hex digest.
 
@@ -89,6 +89,12 @@ For example, a manifest with `"odoo_series": "19.0"`, `"require": {"acme/health-
 ```
 
 The name and position of an index, keys odoopack does not know, `name`, `addons_dir`, `extra` and `format_version` are not part of it: none of them changes what a package resolves to, since a package is locked to the URL of its index. The locked packages are not part of it either; `dist.digest` and `dist.reference` pin their content.
+
+Since the position of an index is not part of it, moving a private index in front of a public one keeps the lockfile fresh and changes only packages that are not locked yet. A locked package stays with its `index_url` until it is resolved again, for example by `odoopack update`.
+
+### How the hash may change
+
+A key that a later release makes part of resolution, such as `require_dev`, joins the hashed object only when the manifest has it. A manifest without the key keeps its hash, so upgrading odoopack does not make its lockfile stale. Any other change to these steps raises the `format_version` of the lockfile, so that an older odoopack refuses the lockfile instead of computing another hash and calling it stale.
 
 ## Staleness
 
