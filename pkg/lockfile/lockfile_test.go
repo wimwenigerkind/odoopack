@@ -289,3 +289,20 @@ func TestLoadRejectsInvalidModule(t *testing.T) {
 		}
 	}
 }
+
+func TestComputeHashOfEmptyManifest(t *testing.T) {
+	canonical := `{"indexes":[],"odoo_series":"19.0","require":{}}`
+	want := fmt.Sprintf("sha256:%x", sha256.Sum256([]byte(canonical)))
+
+	for _, require := range []map[string]string{nil, {}} {
+		for _, indexes := range []manifest.Indexes{nil, {}} {
+			got, err := ComputeHash(require, indexes, "19.0")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != want {
+				t.Fatalf("require %#v and indexes %#v hash to %s, want %s, the sha256 of %s", require, indexes, got, want, canonical)
+			}
+		}
+	}
+}
