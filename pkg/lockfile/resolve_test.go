@@ -139,8 +139,7 @@ func release(version string, depends ...string) registryapi.Version {
 	return v
 }
 
-// locked is the package pkg locked to the index at indexURL with the dist release
-// serves.
+// locked returns pkg locked with the dist release serves.
 func locked(pkg, indexURL, version string, direct bool, depends ...string) LockedPackage {
 	v := release(version)
 	return LockedPackage{

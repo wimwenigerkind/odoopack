@@ -11,27 +11,20 @@ import (
 	"github.com/wimwenigerkind/odoopack-spec/version"
 )
 
-// IndexTypes are the index types this odoopack can search. An index of
-// another type is refused instead of skipped, since skipping it would
-// resolve a name from the next index that a newer odoopack resolves from it.
+// An unknown index type is refused, not skipped: skipping it would resolve a
+// name from the next index, which a newer odoopack resolves from this one.
 var IndexTypes = []string{"registry"}
 
 var (
 	// seriesPattern spells a series like a version does: no leading zeros.
 	seriesPattern    = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
 	indexNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,63}$`)
-	// addonsDirPattern is a relative path with / as separator, of characters
-	// every file system takes, so the same manifest means the same directory
-	// on Linux, macOS and Windows: no backslash, no drive colon.
+	// addonsDirPattern is portable: no backslash, no drive colon.
 	addonsDirPattern = regexp.MustCompile(`^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$`)
 )
 
-// Validate reports every problem of m at once, so that a manifest can be
-// fixed in one go.
 func (m Manifest) Validate() error {
 	var errs []error
-	// name is optional, but takes the grammar of a package name, so that it
-	// can name the project as a package later.
 	if m.Name != "" {
 		if err := name.ValidPackage(m.Name); err != nil {
 			errs = append(errs, fmt.Errorf("name %q must be written like a package name: %w", m.Name, err))
@@ -65,8 +58,7 @@ func (m Manifest) Validate() error {
 			errs = append(errs, fmt.Errorf("index name %q is used twice", idx.Name))
 		}
 		names[idx.Name] = true
-		// A package is locked to the URL of its index, so two indexes with
-		// one URL would be one index under two names.
+		// Packages are locked by URL, so one URL under two names is one index.
 		if other, ok := urls[idx.Url]; ok {
 			errs = append(errs, fmt.Errorf("indexes %s and %s have the same url %s", other, idx.Name, idx.Url))
 		}
@@ -75,7 +67,6 @@ func (m Manifest) Validate() error {
 	return errors.Join(errs...)
 }
 
-// ValidSeries reports whether series names an Odoo series such as 19.0.
 func ValidSeries(series string) error {
 	if series == "" {
 		return errors.New(`odoo_series is not set; add "odoo_series": "19.0"`)
@@ -86,9 +77,7 @@ func ValidSeries(series string) error {
 	return nil
 }
 
-// ValidAddonsDir reports whether dir is a portable relative path inside the
-// project. Whether it stays inside the project through symlinks depends on
-// the file system, which addonsdir.Check looks at before anything is written.
+// ValidAddonsDir cannot see symlinks; addonsdir.Check does before a write.
 func ValidAddonsDir(dir string) error {
 	if dir == "" {
 		return errors.New(`addons_dir is not set; add "addons_dir": "addons/odoopack"`)
@@ -104,11 +93,8 @@ func ValidAddonsDir(dir string) error {
 	return nil
 }
 
-// ValidConstraint reports whether constraint is one of the forms a
-// requirement takes, an exact release, a series or a dev branch, and fits
-// series, the odoo_series of the project. A release carries its series; so
-// does a branch named after one, such as dev-18.0. Another branch name says
-// nothing about the series and is left to the registry.
+// ValidConstraint leaves a branch whose name is no series, such as
+// dev-feature/x, unchecked against the series.
 func ValidConstraint(constraint, series string) error {
 	if constraint != strings.TrimSpace(constraint) {
 		return fmt.Errorf("constraint %q has surrounding spaces", constraint)
@@ -150,9 +136,6 @@ func (idx Index) Validate() error {
 	return fmt.Errorf("index %s has type %q, which this odoopack does not know (known: %s); upgrade odoopack", idx.Name, idx.Type, strings.Join(IndexTypes, ", "))
 }
 
-// ValidIndexURL accepts an http or https URL of scheme, host and an optional
-// path. Credentials belong in ODOOPACK_AUTH, never in the manifest that is
-// committed, and the lockfile copies the URL.
 func ValidIndexURL(raw string) error {
 	u, err := url.Parse(raw)
 	if err != nil {
@@ -176,11 +159,8 @@ func ValidIndexURL(raw string) error {
 	return nil
 }
 
-// CanonicalURL is the one spelling of an index URL the manifest takes:
-// scheme and host in lower case, no default port and no trailing slash.
-// content_hash and index_url use the URL as written, so two spellings of
-// one registry must not exist, and a tool other than odoopack must not need
-// rules of its own to compare them.
+// CanonicalURL is the only spelling the manifest takes, since content_hash and
+// index_url compare URLs as written.
 func CanonicalURL(raw string) string {
 	u, err := url.Parse(raw)
 	// Decoding an escape would change the path, a%2Fb into a/b, so a URL
@@ -204,7 +184,6 @@ func CanonicalURL(raw string) string {
 	return u.String()
 }
 
-// redact keeps credentials out of the error, which may end up in a CI log.
 func redact(u *url.URL) string {
 	c := *u
 	c.User = url.User("REDACTED")

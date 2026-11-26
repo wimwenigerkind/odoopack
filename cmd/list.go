@@ -48,8 +48,6 @@ var listCmd = &cobra.Command{
 	},
 }
 
-// installedStatus reports whether the module of a package the lockfile
-// holds is installed; a package without a lockfile entry is not.
 func installedStatus(addonsDir, module string) string {
 	if module == "" {
 		return "no"

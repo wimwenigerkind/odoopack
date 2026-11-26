@@ -241,9 +241,6 @@ func TestLoadRejectsDuplicateKeys(t *testing.T) {
 	}
 }
 
-// TestComputeHashIsCanonical pins content_hash to its definition: the
-// RFC 8785 form of odoo_series, require and the indexes by URL, which a tool
-// other than odoopack computes the same way.
 func TestComputeHashIsCanonical(t *testing.T) {
 	require := map[string]string{"acme/health-check": "19.0", "acme/base-tools": "19.0.1.0.0"}
 	indexes := manifest.Indexes{

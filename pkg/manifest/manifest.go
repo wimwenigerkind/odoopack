@@ -14,13 +14,8 @@ import (
 	"github.com/wimwenigerkind/odoopack/pkg/ui"
 )
 
-// FileName is the manifest of the project in the working directory. It is
-// part of the format, like Composer's composer.json, so it is not
-// configurable.
 const FileName = "odoopack.json"
 
-// DefaultAddonsDir is the addons_dir init writes unless the configuration
-// names another.
 const DefaultAddonsDir = "addons/odoopack"
 
 func Load() (*Manifest, error) {
@@ -45,9 +40,8 @@ func Load() (*Manifest, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Save keeps these keys, so a key a newer odoopack added survives a
-	// write by this one. The warning catches a misspelt key, which would
-	// otherwise be ignored silently.
+	// The warning catches a misspelt key, which Save would otherwise keep
+	// silently.
 	for _, key := range manifest.UnknownKeys() {
 		ui.Warn("%s: unknown key %q is kept but ignored by this odoopack", FileName, key)
 	}
@@ -60,8 +54,7 @@ func Load() (*Manifest, error) {
 
 func Save(manifest Manifest) error {
 	manifest.FormatVersion = FormatVersion
-	// A command validates its input before it changes anything; this keeps a
-	// mistake in one from writing a manifest no odoopack would load again.
+	// A backstop: commands check their input before they change anything.
 	if err := manifest.Validate(); err != nil {
 		return fmt.Errorf("refusing to write %s: %w", FileName, err)
 	}
@@ -72,9 +65,6 @@ func Save(manifest Manifest) error {
 	return helper.WriteJSONFile(FileName, data)
 }
 
-// ProjectName turns the name of a directory into a project name: lower
-// case, every run of other characters a single "-". It returns "" when
-// nothing valid is left, and init then writes no name.
 func ProjectName(dir string) string {
 	var b strings.Builder
 	dash := false

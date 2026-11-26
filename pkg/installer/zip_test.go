@@ -142,7 +142,7 @@ func TestZipInstallRejectsMalformedDigest(t *testing.T) {
 	}
 }
 
-// A lockfile written before odoopack required a zipDigest may lack one.
+// A hand-edited lockfile may lack the digest.
 func TestZipInstallRequiresDigest(t *testing.T) {
 	srv, _, downloads := serveAddonZip(t)
 	pkg := lockfile.LockedPackage{Module: "acme_health_check", Dist: lockfile.Dist{Type: "zip", URL: srv.URL}}

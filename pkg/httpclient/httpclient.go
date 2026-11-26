@@ -95,8 +95,6 @@ func NewRequest(ctx context.Context, rawURL, token string) (*http.Request, error
 	return req, nil
 }
 
-// IsLoopback reports whether host is this machine, the only place plain
-// http is allowed, for a registry under development.
 func IsLoopback(host string) bool {
 	if host == "localhost" {
 		return true

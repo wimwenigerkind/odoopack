@@ -26,8 +26,6 @@ func TestLoadRejectsInvalidName(t *testing.T) {
 	}
 }
 
-// useManifest points the manifest setting at a manifest in a temporary
-// directory that holds content.
 func useManifest(t *testing.T, content string) string {
 	t.Helper()
 	dir := t.TempDir()
