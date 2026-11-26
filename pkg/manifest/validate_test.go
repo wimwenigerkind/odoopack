@@ -51,6 +51,7 @@ func TestValidateRejects(t *testing.T) {
 		{"token in query", func(m *Manifest) { m.Indexes[0].Url = "https://registry.example.com?token=secret" }, "query or fragment"},
 		{"credentials with another scheme", func(m *Manifest) { m.Indexes[0].Url = "ftp://user:secret@registry.example.com" }, "must start with https://"},
 		{"credentials without host", func(m *Manifest) { m.Indexes[0].Url = "https://user:secret@/odoo" }, "has no host"},
+		{"credentials without slashes", func(m *Manifest) { m.Indexes[0].Url = "https:user:secret@registry.example.com" }, "has no host"},
 		{"unparsable with credentials", func(m *Manifest) { m.Indexes[0].Url = "https://user:secret@registry.example.com/%zz" }, "is not a valid url"},
 		{"fragment", func(m *Manifest) { m.Indexes[0].Url = "https://registry.example.com#x" }, "query or fragment"},
 		{"scheme", func(m *Manifest) { m.Indexes[0].Url = "ftp://registry.example.com" }, "https://"},

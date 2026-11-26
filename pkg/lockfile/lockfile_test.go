@@ -138,6 +138,7 @@ func TestLockPackageRequiresIntegrity(t *testing.T) {
 		{"zip with credentials", index.AddonVersion{Type: "zip", Digest: zipDigest, Repository: "https://user:secret@cdn.example.com/x.zip"}, "must not contain credentials"},
 		{"zip with token as user", index.AddonVersion{Type: "zip", Digest: zipDigest, Repository: "https://secret@cdn.example.com/x.zip"}, "must not contain credentials"},
 		{"zip with signed query", index.AddonVersion{Type: "zip", Digest: zipDigest, Repository: "https://cdn.example.com/x.zip?X-Amz-Signature=secret"}, "must not have a query"},
+		{"zip with credentials without slashes", index.AddonVersion{Type: "zip", Digest: zipDigest, Repository: "https:user:secret@cdn.example.com/x.zip"}, "not an absolute url"},
 		{"zip with fragment", index.AddonVersion{Type: "zip", Digest: zipDigest, Repository: "https://cdn.example.com/x.zip#secret"}, "must not have a fragment"},
 		{"git over ssh with user", index.AddonVersion{Type: "git", Reference: commit, Repository: "ssh://git@github.com/acme/x.git"}, ""},
 		{"git scp style", index.AddonVersion{Type: "git", Reference: commit, Repository: "git@github.com:acme/x.git"}, ""},
