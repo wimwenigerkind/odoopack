@@ -29,7 +29,7 @@ The lockfile pins the exact distribution of every requirement so that installs a
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `format_version` | integer | Version of the lockfile format, currently `1`. A lockfile without it is version 1. odoopack refuses a lockfile with a higher version than it knows and asks you to upgrade odoopack; it always writes the current version. Adding an optional field does not raise it. Not part of `content_hash`, so a lockfile does not become stale when it gains the field. |
+| `format_version` | integer | Version of the lockfile format, currently `1`. A JSON integer: `1.0` and `"1"` are refused. A lockfile without it is version 1. odoopack refuses a lockfile with a higher version than it knows and asks you to upgrade odoopack; it always writes the current version. Adding an optional field does not raise it. Not part of `content_hash`, so a lockfile does not become stale when it gains the field. |
 | `content_hash` | string | `sha256:` hash of what the manifest resolves the packages from. Used to detect when the lockfile is stale relative to the manifest. See [Content hash](#content-hash). |
 | `packages` | object | Map of addon name to the locked package. |
 

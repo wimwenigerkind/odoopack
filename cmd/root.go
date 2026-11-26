@@ -35,7 +35,7 @@ var cfgFile string
 
 var rootCmd = &cobra.Command{
 	Use:   "odoopack",
-	Short: "Package manager for Odoo 19 addons",
+	Short: "Package manager for Odoo addons",
 }
 
 func Execute() {

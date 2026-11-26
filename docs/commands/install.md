@@ -23,7 +23,7 @@ odoopack install [--frozen-lockfile] [--no-cache]
 
 ## Behavior
 
-1. Loads `odoopack.json`. If there are no requirements, it prints `no addons installed` and exits.
+1. Loads `odoopack.json`. If there are no requirements, it prints `no addons required` and exits.
 2. Loads `odoopack.lock`. If the lockfile is **stale** (its content hash no longer matches the current requirements, indexes and `odoo_series`), the requirements are re-resolved against the registry and the lockfile is rewritten before installing. With `--frozen-lockfile`, a missing or stale lockfile is an error instead, and nothing is written.
 3. Checks `addons_dir` before touching anything: it must be a relative path that resolves, also through symlinks, to a directory strictly inside the project, and must not be the project directory itself.
 4. Removes the entire addons path and reinstalls all locked packages concurrently. Zip distributions come from the shared [package store](cache.md) and are only downloaded when the store does not have them yet.
