@@ -60,7 +60,7 @@ func (m Manifest) Validate() error {
 		names[idx.Name] = true
 		// Packages are locked by URL, so one URL under two names is one index.
 		if other, ok := urls[idx.Url]; ok {
-			errs = append(errs, fmt.Errorf("indexes %s and %s have the same url %s", other, idx.Name, idx.Url))
+			errs = append(errs, fmt.Errorf("indexes %s and %s have the same url", other, idx.Name))
 		}
 		urls[idx.Url] = idx.Name
 	}

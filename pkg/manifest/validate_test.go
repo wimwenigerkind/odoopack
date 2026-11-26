@@ -58,6 +58,10 @@ func TestValidateRejects(t *testing.T) {
 		{"same url twice", func(m *Manifest) {
 			m.Indexes = append(m.Indexes, Index{Name: "other", Url: m.Indexes[0].Url, Type: "registry"})
 		}, "have the same url"},
+		{"same url with credentials twice", func(m *Manifest) {
+			m.Indexes[0].Url = "https://user:secret@registry.example.com"
+			m.Indexes = append(m.Indexes, Index{Name: "other", Url: m.Indexes[0].Url, Type: "registry"})
+		}, "indexes company and other have the same url"},
 		{"release of another series", func(m *Manifest) { m.Require["acme/x"] = "18.0.1.0.0" }, "18.0.1.0.0 targets Odoo 18.0, but odoo_series is 19.0"},
 		{"another series", func(m *Manifest) { m.Require["acme/x"] = "18.0" }, "series 18.0 does not match odoo_series 19.0"},
 		{"branch of another series", func(m *Manifest) { m.Require["acme/x"] = "dev-18.0" }, "dev-18.0 targets Odoo 18.0"},
