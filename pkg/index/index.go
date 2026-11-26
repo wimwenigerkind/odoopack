@@ -15,7 +15,7 @@ type AddonVersion struct {
 	Type       string
 	Repository string
 	Reference  string
-	Shasum     string
+	Digest     string
 	Depends    []Dep
 	// Registry is the normalized URL of the index the addon came from. Lookup
 	// sets it, a Provider does not know it.

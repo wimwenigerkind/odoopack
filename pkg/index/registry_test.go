@@ -18,14 +18,14 @@ import (
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
 )
 
-const testShasum = "sha256:ece96e65881389c3ef6538ea26b9d7149e8e0af042c828d17283c6b76c633543"
+const testDigest = "sha256:ece96e65881389c3ef6538ea26b9d7149e8e0af042c828d17283c6b76c633543"
 
 func validVersion(v string) registryapi.Version {
 	return registryapi.Version{
 		Version: v,
 		Type:    registryapi.TypeZip,
 		URL:     "https://registry.example.com/registry/v1/zipball/f1740dd9-ca0e-42fd-a63b-b553d3fd3882/ece96e65881389c3ef6538ea26b9d7149e8e0af042c828d17283c6b76c633543",
-		Shasum:  testShasum,
+		Digest:  testDigest,
 	}
 }
 
@@ -113,7 +113,7 @@ func TestRegistryLookupRejectsOtherResponseName(t *testing.T) {
 
 func TestRegistryLookupSkipsInvalidVersion(t *testing.T) {
 	broken := validVersion("19.0.2.0.0")
-	broken.Shasum = ""
+	broken.Digest = ""
 	p, _ := serveAddon(t, registryapi.Addon{Name: "acme/health-check", Versions: []registryapi.Version{validVersion("19.0.1.0.0"), broken}})
 
 	var got AddonVersion

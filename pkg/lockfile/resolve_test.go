@@ -41,7 +41,7 @@ func addon(name string, depends ...string) registryapi.Addon {
 		Version: "19.0.1.0.0",
 		Type:    registryapi.TypeZip,
 		URL:     "https://registry.example.com/registry/v1/zipball/f1740dd9-ca0e-42fd-a63b-b553d3fd3882/ece96e65881389c3ef6538ea26b9d7149e8e0af042c828d17283c6b76c633543",
-		Shasum:  "sha256:ece96e65881389c3ef6538ea26b9d7149e8e0af042c828d17283c6b76c633543",
+		Digest:  "sha256:ece96e65881389c3ef6538ea26b9d7149e8e0af042c828d17283c6b76c633543",
 	}
 	for _, d := range depends {
 		v.Depends = append(v.Depends, registryapi.Dep{Module: strings.ReplaceAll(strings.Split(d, "/")[1], "-", "_"), Package: d, Access: registryapi.AccessOK})
@@ -146,7 +146,7 @@ func locked(pkg, indexURL, version string, direct bool, depends ...string) Locke
 	return LockedPackage{
 		Version:  version,
 		Module:   name.ModuleName(pkg),
-		Dist:     Dist{Type: v.Type, URL: v.URL, Digest: v.Shasum},
+		Dist:     Dist{Type: v.Type, URL: v.URL, Digest: v.Digest},
 		Direct:   direct,
 		Depends:  depends,
 		IndexURL: indexURL,

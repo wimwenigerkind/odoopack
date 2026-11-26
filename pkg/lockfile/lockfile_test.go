@@ -114,31 +114,31 @@ func TestUnknownIndexKeysKeepContentHash(t *testing.T) {
 }
 
 func TestLockPackageRequiresIntegrity(t *testing.T) {
-	const shasum = "sha256:ece96e65881389c3ef6538ea26b9d7149e8e0af042c828d17283c6b76c633543"
+	const zipDigest = "sha256:ece96e65881389c3ef6538ea26b9d7149e8e0af042c828d17283c6b76c633543"
 	const commit = "6b6c390a387c81ee604b602e49ca6c35646cc619"
 	tests := []struct {
 		name    string
 		lookup  index.AddonVersion
 		wantErr string
 	}{
-		{"zip with shasum", index.AddonVersion{Type: "zip", Shasum: shasum}, ""},
+		{"zip with digest", index.AddonVersion{Type: "zip", Digest: zipDigest}, ""},
 		{"zip without digest", index.AddonVersion{Type: "zip"}, "zip has no digest"},
-		{"zip with md5", index.AddonVersion{Type: "zip", Shasum: "md5:00"}, "unsupported algorithm"},
+		{"zip with md5", index.AddonVersion{Type: "zip", Digest: "md5:00"}, "unsupported algorithm"},
 		{"git with commit", index.AddonVersion{Type: "git", Reference: commit}, ""},
 		{"git with sha256 commit", index.AddonVersion{Type: "git", Reference: strings.Repeat("a", 64)}, ""},
 		{"git without reference", index.AddonVersion{Type: "git"}, "git has no reference"},
 		{"git with tag", index.AddonVersion{Type: "git", Reference: "19.0.1.0.0"}, "must be a full commit id"},
 		{"git with uppercase commit", index.AddonVersion{Type: "git", Reference: strings.ToUpper(commit)}, "must be a full commit id"},
-		{"unknown type", index.AddonVersion{Type: "svn", Shasum: shasum}, `type "svn"`},
-		{"zip over http", index.AddonVersion{Type: "zip", Shasum: shasum, Repository: "http://registry.example.com/zipball/x"}, "must use https"},
-		{"zip over http to localhost", index.AddonVersion{Type: "zip", Shasum: shasum, Repository: "http://localhost:8080/zipball/x"}, ""},
-		{"zip over http to loopback", index.AddonVersion{Type: "zip", Shasum: shasum, Repository: "http://127.0.0.1:8080/zipball/x"}, ""},
-		{"zip with relative url", index.AddonVersion{Type: "zip", Shasum: shasum, Repository: "/zipball/x"}, "not an absolute url"},
-		{"zip with credentials over http", index.AddonVersion{Type: "zip", Shasum: shasum, Repository: "http://user:secret@registry.example.com/x"}, "must not contain credentials"},
-		{"zip with credentials", index.AddonVersion{Type: "zip", Shasum: shasum, Repository: "https://user:secret@cdn.example.com/x.zip"}, "must not contain credentials"},
-		{"zip with token as user", index.AddonVersion{Type: "zip", Shasum: shasum, Repository: "https://secret@cdn.example.com/x.zip"}, "must not contain credentials"},
-		{"zip with signed query", index.AddonVersion{Type: "zip", Shasum: shasum, Repository: "https://cdn.example.com/x.zip?X-Amz-Signature=secret"}, "must not have a query"},
-		{"zip with fragment", index.AddonVersion{Type: "zip", Shasum: shasum, Repository: "https://cdn.example.com/x.zip#secret"}, "must not have a fragment"},
+		{"unknown type", index.AddonVersion{Type: "svn", Digest: zipDigest}, `type "svn"`},
+		{"zip over http", index.AddonVersion{Type: "zip", Digest: zipDigest, Repository: "http://registry.example.com/zipball/x"}, "must use https"},
+		{"zip over http to localhost", index.AddonVersion{Type: "zip", Digest: zipDigest, Repository: "http://localhost:8080/zipball/x"}, ""},
+		{"zip over http to loopback", index.AddonVersion{Type: "zip", Digest: zipDigest, Repository: "http://127.0.0.1:8080/zipball/x"}, ""},
+		{"zip with relative url", index.AddonVersion{Type: "zip", Digest: zipDigest, Repository: "/zipball/x"}, "not an absolute url"},
+		{"zip with credentials over http", index.AddonVersion{Type: "zip", Digest: zipDigest, Repository: "http://user:secret@registry.example.com/x"}, "must not contain credentials"},
+		{"zip with credentials", index.AddonVersion{Type: "zip", Digest: zipDigest, Repository: "https://user:secret@cdn.example.com/x.zip"}, "must not contain credentials"},
+		{"zip with token as user", index.AddonVersion{Type: "zip", Digest: zipDigest, Repository: "https://secret@cdn.example.com/x.zip"}, "must not contain credentials"},
+		{"zip with signed query", index.AddonVersion{Type: "zip", Digest: zipDigest, Repository: "https://cdn.example.com/x.zip?X-Amz-Signature=secret"}, "must not have a query"},
+		{"zip with fragment", index.AddonVersion{Type: "zip", Digest: zipDigest, Repository: "https://cdn.example.com/x.zip#secret"}, "must not have a fragment"},
 		{"git over ssh with user", index.AddonVersion{Type: "git", Reference: commit, Repository: "ssh://git@github.com/acme/x.git"}, ""},
 		{"git scp style", index.AddonVersion{Type: "git", Reference: commit, Repository: "git@github.com:acme/x.git"}, ""},
 		{"git over https with token", index.AddonVersion{Type: "git", Reference: commit, Repository: "https://secret@github.com/acme/x.git"}, "must not contain credentials"},
@@ -157,7 +157,7 @@ func TestLockPackageRequiresIntegrity(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if pkg.Module != "acme_health_check" || pkg.Dist.Type != tt.lookup.Type || pkg.Dist.Digest != tt.lookup.Shasum || pkg.Dist.Reference != tt.lookup.Reference {
+				if pkg.Module != "acme_health_check" || pkg.Dist.Type != tt.lookup.Type || pkg.Dist.Digest != tt.lookup.Digest || pkg.Dist.Reference != tt.lookup.Reference {
 					t.Fatalf("locked %+v from %+v", pkg, tt.lookup)
 				}
 				return
