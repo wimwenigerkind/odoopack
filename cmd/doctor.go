@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/wimwenigerkind/odoopack-spec/version"
 	"github.com/wimwenigerkind/odoopack/pkg/addonsdir"
 	"github.com/wimwenigerkind/odoopack/pkg/lockfile"
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
@@ -50,12 +49,6 @@ var doctorCmd = &cobra.Command{
 			warn("no indexes configured, so no addon can be resolved")
 		} else {
 			ok("%d index(es) configured", len(m.Indexes))
-		}
-
-		for name, constraint := range m.Require {
-			if v, err := version.Parse(constraint); err == nil && v.IsRelease() && v.SeriesString() != m.OdooSeries {
-				warn("require %s pins %s which targets Odoo %s, but the project is %s", name, constraint, v.SeriesString(), m.OdooSeries)
-			}
 		}
 
 		if lf, err := lockfile.Load(); err != nil {

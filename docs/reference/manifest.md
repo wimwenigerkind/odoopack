@@ -58,8 +58,8 @@ A constraint in `require` takes exactly one of three forms. Each keeps its meani
 | Form | Example | Meaning |
 | --- | --- | --- |
 | Release | `19.0.1.0.0` | Exactly this release. Five numbers separated by `.`, without leading zeros; the first two are the Odoo series and must match `odoo_series`. |
-| Series | `19.0` | The newest release of the series, resolved when the lockfile is written and pinned there until the package is resolved again, by `odoopack update` or by `odoopack install` on a stale lockfile. `require` writes this form when no version is given. |
-| Branch build | `dev-19.0` | The head of a branch, pinned in the lockfile by its commit. The branch name takes `A-Z`, `a-z`, `0-9`, `.`, `_`, `/` and `-`, must not contain `..`, start with `-` or `/`, or end with `/` or `.lock`. |
+| Series | `19.0` | Must be `odoo_series` itself. The newest release of the series, resolved when the lockfile is written and pinned there until the package is resolved again, by `odoopack update` or by `odoopack install` on a stale lockfile. `require` writes this form when no version is given. |
+| Branch build | `dev-19.0` | The head of a branch, pinned in the lockfile by its commit. The branch name takes `A-Z`, `a-z`, `0-9`, `.`, `_`, `/` and `-`, must not contain `..`, start with `-` or `/`, or end with `/` or `.lock`. A branch named after a series, such as `dev-18.0`, must match `odoo_series`; any other branch name, such as `dev-feature/x`, is not checked against it. |
 
 Anything else is refused, such as `latest`, `^19.0`, `>=19.0.1.0.0`, `19.0.*` or `19.0.1`. The characters `^`, `~`, `<`, `>`, `=`, `*`, `|`, `,` and whitespace are reserved for a range syntax a later format version may add.
 

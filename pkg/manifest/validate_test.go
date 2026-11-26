@@ -20,6 +20,7 @@ func TestValidateAcceptsValidManifest(t *testing.T) {
 	m := validManifest()
 	m.Require["acme/base-tools"] = "19.0.1.0.0"
 	m.Require["acme/wip"] = "dev-19.0"
+	m.Require["acme/feature"] = "dev-feature/x"
 	m.Indexes = append(m.Indexes, Index{Name: "local_2", Url: "http://localhost:8080", Type: "registry"})
 	m.AddonsDir = "vendor/Odoo.addons/third_party-1"
 	if err := m.Validate(); err != nil {
@@ -53,6 +54,9 @@ func TestValidateRejects(t *testing.T) {
 		{"same url twice", func(m *Manifest) {
 			m.Indexes = append(m.Indexes, Index{Name: "other", Url: m.Indexes[0].Url, Type: "registry"})
 		}, "have the same url"},
+		{"release of another series", func(m *Manifest) { m.Require["acme/x"] = "18.0.1.0.0" }, "18.0.1.0.0 targets Odoo 18.0, but odoo_series is 19.0"},
+		{"another series", func(m *Manifest) { m.Require["acme/x"] = "18.0" }, "series 18.0 does not match odoo_series 19.0"},
+		{"branch of another series", func(m *Manifest) { m.Require["acme/x"] = "dev-18.0" }, "dev-18.0 targets Odoo 18.0"},
 		{"addons_dir missing", func(m *Manifest) { m.AddonsDir = "" }, "addons_dir is not set"},
 		{"addons_dir backslash", func(m *Manifest) { m.AddonsDir = `addons\odoopack` }, "addons_dir"},
 		{"addons_dir absolute", func(m *Manifest) { m.AddonsDir = "/srv/addons" }, "addons_dir"},
