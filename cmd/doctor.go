@@ -31,8 +31,6 @@ var doctorCmd = &cobra.Command{
 			ok("name: %s", m.Name)
 		}
 
-		// Load refuses an invalid series, index or constraint, so doctor
-		// only checks what it does not.
 		ok("odoo series: %s", m.OdooSeries)
 
 		if wd, err := os.Getwd(); err != nil {

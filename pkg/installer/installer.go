@@ -29,8 +29,7 @@ func New(sourceType string) (Installer, error) {
 	}
 }
 
-// addonDir returns the directory pkg installs to in targetDir. It checks the
-// module again, since the lockfile it comes from may be edited by hand.
+// addonDir checks the module again, since the lockfile may be edited by hand.
 func addonDir(targetDir string, pkg lockfile.LockedPackage) (string, error) {
 	if err := name.ValidModule(pkg.Module); err != nil {
 		return "", err
@@ -38,8 +37,6 @@ func addonDir(targetDir string, pkg lockfile.LockedPackage) (string, error) {
 	return filepath.Join(targetDir, pkg.Module), nil
 }
 
-// checkIntegrity refuses a package the installer could not verify, such as a
-// zip locked by an odoopack that did not require a digest yet.
 func checkIntegrity(addonName string, pkg lockfile.LockedPackage) error {
 	if err := pkg.Dist.CheckIntegrity(); err != nil {
 		return fmt.Errorf("%w; run \"odoopack update %s\" to lock it again", err, addonName)

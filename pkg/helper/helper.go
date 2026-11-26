@@ -23,8 +23,7 @@ func FileExists(path string) (bool, error) {
 	return true, nil
 }
 
-// CheckFormatVersion returns the format version of the file at path: a file
-// without the field is version 1, and a version above current is refused, so
+// CheckFormatVersion reads a missing version as 1 and refuses a newer one, so
 // that an older odoopack does not misread a file a newer one wrote.
 func CheckFormatVersion(path string, got, current int) (int, error) {
 	switch {
@@ -38,16 +37,13 @@ func CheckFormatVersion(path string, got, current int) (int, error) {
 	return got, nil
 }
 
-// WriteJSONFile writes a JSON document with a trailing newline, as editors and
-// POSIX tools expect, and atomically: a reader, or an interrupted odoopack,
-// sees the old file or the new one, never a truncated mix.
+// WriteJSONFile writes atomically, so that an interrupted odoopack never
+// leaves a truncated file.
 func WriteJSONFile(path string, data []byte) error {
 	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".*")
 	if err != nil {
 		return err
 	}
-	// After the rename the temporary name is gone, so this only cleans up a
-	// failed write.
 	defer func() { _ = os.Remove(tmp.Name()) }()
 
 	if _, err := tmp.Write(append(data, '\n')); err != nil {
@@ -61,8 +57,7 @@ func WriteJSONFile(path string, data []byte) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	// CreateTemp creates the file with 0600; the manifest and lockfile are
-	// committed and read by others.
+	// CreateTemp creates the file with 0600, but the file is committed.
 	if err := os.Chmod(tmp.Name(), 0644); err != nil {
 		return err
 	}

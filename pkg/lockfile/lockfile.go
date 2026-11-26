@@ -19,8 +19,6 @@ import (
 	"github.com/wimwenigerkind/odoopack/pkg/manifest"
 )
 
-// FileName is the lockfile next to the manifest. It is part of the format,
-// so it is not configurable.
 const FileName = "odoopack.lock"
 
 // LoadOrNew returns an empty lockfile when none exists. Any other problem is
@@ -77,10 +75,8 @@ func Load() (LockFile, error) {
 	return lockFile, nil
 }
 
-// CheckModules refuses a module that is not a single directory name, which
-// could reach outside addons_dir, and packages that install into the same
-// directory, since one would silently overwrite the other: name.ModuleName
-// maps both "/" and "-" to "_".
+// CheckModules refuses a module that could reach outside addons_dir, and two
+// packages in one directory: name.ModuleName maps "/" and "-" to "_".
 func CheckModules(packages map[string]LockedPackage) error {
 	names := make([]string, 0, len(packages))
 	for pkg := range packages {
@@ -111,13 +107,8 @@ func Save(lockFile LockFile) error {
 	return helper.WriteJSONFile(FileName, data)
 }
 
-// ComputeHash covers what the manifest resolves the packages from, so that
-// a change to it makes the lockfile stale, and nothing else, so that any tool
-// can compute it from the manifest alone: the RFC 8785 canonical form of
-// odoo_series, require and the URL and type of each index, sorted by URL. The
-// name and position of an index stay out, since a package is locked to the
-// URL of its index; so do the locked packages, which dist.digest and
-// dist.reference pin.
+// ComputeHash implements content_hash as docs/reference/lockfile.md
+// specifies it.
 func ComputeHash(require map[string]string, indexes manifest.Indexes, odooSeries string) (string, error) {
 	data, err := json.Marshal(struct {
 		OdooSeries string            `json:"odoo_series"`
@@ -134,9 +125,6 @@ func ComputeHash(require map[string]string, indexes manifest.Indexes, odooSeries
 	return fmt.Sprintf("sha256:%x", sha256.Sum256(canonical)), nil
 }
 
-// hashedIndex is an index as content_hash covers it: keys of the index this
-// odoopack does not know stay out, so that a newer odoopack adding one does
-// not make the lockfile stale for an older one.
 type hashedIndex struct {
 	Url  string `json:"url"`
 	Type string `json:"type"`
@@ -156,9 +144,8 @@ func hashedIndexes(indexes manifest.Indexes) []hashedIndex {
 	return list
 }
 
-// IsStale reports whether the lockfile no longer matches the manifest: its
-// hash differs, or a required package is missing, which the hash cannot tell
-// since it does not cover the packages.
+// IsStale also checks that every required package is locked, which the hash
+// cannot tell since it does not cover the packages.
 func IsStale(require map[string]string, indexes manifest.Indexes, odoo string, packages map[string]LockedPackage, hash string) (bool, error) {
 	for pkg := range require {
 		if _, ok := packages[pkg]; !ok {
@@ -419,10 +406,6 @@ func lockPackage(lookup index.AddonVersion, direct bool, deps, external []string
 	return pkg, nil
 }
 
-// CheckIntegrity reports whether d pins its content: a zip by its sha256
-// digest, a git package by a full commit id. A zip is also downloaded over
-// https only: the digest keeps its content intact, but plain http would show
-// anyone on the way which packages a project installs.
 func (d Dist) CheckIntegrity() error {
 	switch d.Type {
 	case "zip":
@@ -445,9 +428,6 @@ func (d Dist) CheckIntegrity() error {
 	return fmt.Errorf("type %q must be \"zip\" or \"git\"", d.Type)
 }
 
-// checkZipURL accepts a stable https URL without credentials: the lockfile
-// is committed, so a token or a signed query in it would leak, and a signed
-// URL expires and leaves a lockfile that no longer installs.
 func checkZipURL(raw string) error {
 	u, err := url.Parse(raw)
 	if err != nil || u.Host == "" {
@@ -465,8 +445,7 @@ func checkZipURL(raw string) error {
 	return fmt.Errorf("zip url %s must use https (plain http is only allowed for localhost)", redactURL(raw))
 }
 
-// checkGitURL refuses credentials in a git URL for the same reason. An ssh
-// user such as git@ names the account, not a secret, so it stays allowed.
+// An ssh user such as git@ names the account, not a secret.
 func checkGitURL(raw string) error {
 	if !strings.Contains(raw, "://") {
 		return nil
@@ -484,8 +463,6 @@ func checkGitURL(raw string) error {
 	return nil
 }
 
-// checkStable refuses what makes a dist URL secret or short-lived: user
-// info, a query or a fragment.
 func checkStable(u *url.URL, raw string) error {
 	switch {
 	case u.User != nil && u.Scheme != "ssh":
@@ -498,8 +475,7 @@ func checkStable(u *url.URL, raw string) error {
 	return nil
 }
 
-// redactURL keeps user info and the query out of an error, which may end up
-// in a CI log: either can hold a token.
+// redactURL drops the user too, not only the password: it can be a token.
 func redactURL(raw string) string {
 	u, err := url.Parse(raw)
 	if err != nil {

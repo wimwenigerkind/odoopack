@@ -17,8 +17,8 @@ type AddonVersion struct {
 	Reference  string
 	Digest     string
 	Depends    []Dep
-	// Registry is the normalized URL of the index the addon came from. Lookup
-	// sets it, a Provider does not know it.
+	// Registry is the URL of the index the addon came from. Lookup sets it, a
+	// Provider does not know it.
 	Registry string
 }
 
@@ -52,15 +52,10 @@ func Lookup(indexes manifest.Indexes, name, constraint, odooSeries string) (Addo
 	return LookupLocked(indexes, "", name, constraint, odooSeries)
 }
 
-// locatedBy reports whether a package locked to the index URL locked comes
-// from idx. A package is locked to the URL, so renaming the index does not
-// change the lockfile.
 func locatedBy(idx manifest.Index, locked string) bool {
 	return locked != "" && idx.Url == locked
 }
 
-// HasIndex reports whether indexes still have the index a package is locked
-// to by its URL.
 func HasIndex(indexes manifest.Indexes, locked string) bool {
 	for _, idx := range indexes {
 		if locatedBy(idx, locked) {
@@ -70,9 +65,8 @@ func HasIndex(indexes manifest.Indexes, locked string) bool {
 	return false
 }
 
-// LookupLocked resolves an addon from the index with the URL locked only,
-// when that index still exists. Otherwise it tries the indexes of the
-// manifest in their order.
+// LookupLocked asks only the index a package is locked to while the manifest
+// still has it, and otherwise the indexes in their order.
 func LookupLocked(indexes manifest.Indexes, locked, name, constraint, odooSeries string) (AddonVersion, error) {
 	for _, idx := range indexes {
 		if !locatedBy(idx, locked) {
